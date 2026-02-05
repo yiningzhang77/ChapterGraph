@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import Column, JSON
 from sqlmodel import SQLModel, Field
 
 
@@ -16,6 +17,20 @@ class Chapter(SQLModel, table=True):
     book_id: str = Field(index=True)
     title: Optional[str] = None
     chapter_text: str
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class EnrichedChapter(SQLModel, table=True):
+    __tablename__ = "enriched_chapter"
+
+    id: str = Field(primary_key=True)
+    book_id: str = Field(index=True)
+    order: Optional[int] = None
+    title: Optional[str] = None
+    chapter_text: str
+    sections: list[str] = Field(default_factory=list, sa_column=Column(JSON))
+    signals: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    enrichment_version: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
