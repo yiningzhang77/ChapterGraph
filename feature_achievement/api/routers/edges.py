@@ -1,40 +1,111 @@
-from typing import List, Literal, Optional
-import json
+from dataclasses import dataclass
 from datetime import datetime
+import json
+from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlmodel import select, Session
+from sqlmodel import Session, select
 
-# from feature_achievement.api.deps import (
-#     get_retrieval_pipline,
-#     get_enriched_books,
-# )
+from feature_achievement.api.deps import (
+    RetrievalResources,
+    get_retrieval_resources,
+)
+from feature_achievement.db.crud import persist_books_and_chapters, persist_edges
 from feature_achievement.db.engine import get_session
-from feature_achievement.db.models import Edge, Chapter, Book, Run
-from feature_achievement.db.crud import persist_edges, persist_books_and_chapters
-from feature_achievement.retrieval.edge_generation import generate_edges
-from feature_achievement.enrichment import load_all_enriched_data
-from .compute_edges_request import ComputeEdgesRequest
-
+from feature_achievement.db.models import Book, Chapter, Edge, Run
+from feature_achievement.retrieval.candidates.base import CandidateGenerator
 from feature_achievement.retrieval.candidates.tfidf_token import (
     TfidfTokenCandidateGenerator,
 )
-from feature_achievement.retrieval.similarity.tfidf import TfidfSimilarityScorer
-from feature_achievement.retrieval.similarity.embedding import EmbeddingSimilarityScorer
-from feature_achievement.retrieval.pipeline import RetrievalPipeline
 from feature_achievement.retrieval.edge_generation import generate_edges
-
+from feature_achievement.retrieval.pipeline import RetrievalPipeline
+from feature_achievement.retrieval.similarity.base import SimilarityScorer
+from feature_achievement.retrieval.similarity.embedding import EmbeddingSimilarityScorer
+from feature_achievement.retrieval.similarity.tfidf import TfidfSimilarityScorer
+from feature_achievement.retrieval.utils.embedding import build_embedding_index
 from feature_achievement.retrieval.utils.text import collect_chapter_texts
-
 from feature_achievement.retrieval.utils.tfidf import (
     build_tfidf_index,
-    extract_top_tfidf_tokens,
     build_token_index,
+    extract_top_tfidf_tokens,
 )
-from feature_achievement.retrieval.utils.embedding import build_embedding_index
+
+from .compute_edges_request import (
+    CandidateGeneratorType,
+    ComputeEdgesRequest,
+    SimilarityType,
+)
 
 router = APIRouter(prefix="", tags=["edges"])
+
+
+@dataclass
+class RetrievalRuntime:
+    enriched_books: list[dict]
+    chapter_texts: dict[str, str]
+    tfidf_index: dict[str, object]
+    candidate_generator: CandidateGenerator
+    similarity_scorer: SimilarityScorer
+    pipeline: RetrievalPipeline
+
+
+def select_similarity_scorer(
+    req: ComputeEdgesRequest,
+    chapter_texts: dict[str, str],
+    tfidf_index: dict[str, object],
+) -> SimilarityScorer:
+    if req.similarity == SimilarityType.embedding:
+        model_name = req.embedding_model
+        if model_name is None:
+            raise HTTPException(
+                status_code=422,
+                detail="embedding_model is required when similarity='embedding'",
+            )
+        embedding_index = build_embedding_index(chapter_texts, model_name=model_name)
+        return EmbeddingSimilarityScorer(embedding_index)
+    if req.similarity == SimilarityType.tfidf:
+        return TfidfSimilarityScorer(tfidf_index)
+    raise HTTPException(status_code=400, detail="Unsupported similarity")
+
+
+def build_retrieval_runtime(
+    enriched_books: list[dict],
+    req: ComputeEdgesRequest,
+) -> RetrievalRuntime:
+    chapter_texts = collect_chapter_texts(enriched_books)
+    tfidf_index = build_tfidf_index(chapter_texts)
+
+    if req.candidate_generator != CandidateGeneratorType.tfidf_token:
+        raise HTTPException(status_code=400, detail="Unsupported candidate_generator")
+
+    chapter_top_tokens = extract_top_tfidf_tokens(tfidf_index, top_n=20)
+    token_index = build_token_index(chapter_top_tokens)
+    candidate_generator = TfidfTokenCandidateGenerator(
+        chapter_top_tokens=chapter_top_tokens,
+        token_index=token_index,
+        min_shared_tokens=2,
+    )
+
+    similarity_scorer = select_similarity_scorer(
+        req=req,
+        chapter_texts=chapter_texts,
+        tfidf_index=tfidf_index,
+    )
+
+    pipeline = RetrievalPipeline(
+        candidate_generator=candidate_generator,
+        similarity_scorer=similarity_scorer,
+        min_score=req.min_score,
+    )
+    return RetrievalRuntime(
+        enriched_books=enriched_books,
+        chapter_texts=chapter_texts,
+        tfidf_index=tfidf_index,
+        candidate_generator=candidate_generator,
+        similarity_scorer=similarity_scorer,
+        pipeline=pipeline,
+    )
 
 
 class GraphNode(BaseModel):
@@ -69,66 +140,35 @@ class RunResponse(BaseModel):
 def compute_edges(
     req: ComputeEdgesRequest,
     session: Session = Depends(get_session),
-    # pipeline=Depends(get_retrieval_pipline),  # 2. 用 run 参数构建 RetrievalPipeline
-    # enriched_books=Depends(get_enriched_books),
+    resources: RetrievalResources = Depends(get_retrieval_resources),
 ):
-    """
-    Run retrieval pipeline and persist edges into database.
-    Return edges count.
-    """
-    # 1. insert run
     run = Run(
         book_ids=json.dumps(req.book_ids),
         enrichment_version=req.enrichment_version,
-        candidate_generator=req.candidate_generator,
-        similarity=req.similarity,
+        candidate_generator=req.candidate_generator.value,
+        similarity=req.similarity.value,
         min_store=req.min_score,
     )
     session.add(run)
     session.commit()
-    session.refresh(run)  # 拿到 run.id???
+    session.refresh(run)
 
-    # 1️⃣ load enriched data（和以前一模一样)
-    enriched_books = load_all_enriched_data("book_content/books.yaml")
-    enriched_books = [b for b in enriched_books if b["book_id"] in req.book_ids]
-    # 2️⃣ build TF-IDF index（retrieval 的公共资源）
-    chapter_texts = collect_chapter_texts(enriched_books)
-    tfidf_index = build_tfidf_index(chapter_texts)
-
-    # 3️⃣ build TF-IDF token candidate resources
-    chapter_top_tokens = extract_top_tfidf_tokens(tfidf_index, top_n=20)
-    token_index = build_token_index(chapter_top_tokens)
-
-    # 4️⃣ assemble candidate generator
-    candidate_generator = TfidfTokenCandidateGenerator(
-        chapter_top_tokens=chapter_top_tokens,
-        token_index=token_index,
-        min_shared_tokens=2,
-    )
-
-    # 5️⃣ assemble similarity scorer
-    if req.similarity == "embedding":
-        embedding_index = build_embedding_index(
-            chapter_texts,
-            model_name=req.embedding_model,
+    enriched_books = [
+        book for book in resources.enriched_books if book["book_id"] in req.book_ids
+    ]
+    if not enriched_books:
+        raise HTTPException(
+            status_code=400,
+            detail="No matching books for requested book_ids",
         )
-        similarity_scorer = EmbeddingSimilarityScorer(embedding_index)
-    else:
-        similarity_scorer = TfidfSimilarityScorer(tfidf_index)
 
-    # 6️⃣ assemble retrieval pipeline
-    retrieval_pipeline = RetrievalPipeline(
-        candidate_generator=candidate_generator,
-        similarity_scorer=similarity_scorer,
-        min_score=req.min_score,
-    )
+    retrieval_runtime = build_retrieval_runtime(enriched_books, req)
+    edges = generate_edges(enriched_books, retrieval_runtime.pipeline)
 
-    # 7️⃣ run edge generation（真正的“跑图”）
-    edges = generate_edges(enriched_books, retrieval_pipeline)  # 3. compute edges
     persist_books_and_chapters(enriched_books, session)
-    persist_edges(edges, run.id, session)  # 4. persist edges ??? with run_idS
+    persist_edges(edges, run.id, session)
 
-    return {  # 5. return run_id
+    return {
         "run_id": run.id,
         "count": len(edges),
         "message": "edges computed and stored successfully",
@@ -140,18 +180,11 @@ def list_edges(
     book_id: str,
     session: Session = Depends(get_session),
 ):
-    """Query edges by book_id (from_chapter belongs to the book)."""
     stmt = (
         select(Edge)
         .join(Chapter, Edge.from_chapter == Chapter.id)
         .where(Chapter.book_id == book_id)
     )
-    # stmt = select(Edge).where(
-    #     or_(
-    #         Edge.from_chapter.like(f"{book_id}%"),
-    #         Edge.to_chapter.like(f"{book_id}%"),
-    #     )
-    # )
 
     edges = session.exec(stmt).all()
     return {
