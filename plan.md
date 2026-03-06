@@ -375,7 +375,7 @@ def compute_edges(
         enrichment_version=req.enrichment_version,
         candidate_generator=req.candidate_generator.value,
         similarity=req.similarity.value,
-        min_store=req.min_score,
+        min_score=req.min_score,
     )
     session.add(run)
     session.commit()
@@ -527,12 +527,12 @@ if not enriched_books:
 
 ### Phase 6: Optional cleanup after the main refactor
 
-Status: Completed (closed as optional/non-blocking for Level A)
+Status: Completed (implemented: `Run.min_store` renamed to `min_score` with migration script)
 
 Not required for the first pass, but worth tracking:
 
 1. rename `get_retrieval_pipline()` to fix the typo if it remains anywhere,
-2. rename DB field `Run.min_store` to `min_score` in a later schema migration,
+2. add migration script to rename DB field `Run.min_store` -> `Run.min_score`,
 3. consider moving request-to-runtime assembly out of the router package entirely,
 4. add factory/registry only if scorer count grows.
 

@@ -147,7 +147,7 @@ def compute_edges(
         enrichment_version=req.enrichment_version,
         candidate_generator=req.candidate_generator.value,
         similarity=req.similarity.value,
-        min_store=req.min_score,
+        min_score=req.min_score,
     )
     session.add(run)
     session.commit()

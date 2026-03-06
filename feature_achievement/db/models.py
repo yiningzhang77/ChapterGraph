@@ -56,7 +56,7 @@ class Run(SQLModel, table=True):
     # 算法配置
     candidate_generator: str  # "tfidf_token"
     similarity: str
-    min_store: float
+    min_score: float
     top_k: Optional[int] = None
 
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

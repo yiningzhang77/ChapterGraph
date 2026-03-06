@@ -122,6 +122,7 @@ def test_compute_edges_uses_similarity_from_request_contract(monkeypatch):
     assert captured["similarity"] == "tfidf"
     assert persisted["run_id"] == 1
     assert isinstance(dummy_session.added[0], Run)
+    assert dummy_session.added[0].min_score == 0.1
     assert dummy_session.commit_calls == 1
 
 
