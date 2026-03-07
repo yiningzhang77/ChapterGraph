@@ -3,10 +3,6 @@ import os
 
 from feature_achievement.ingestion import convert_content_to_json, dump_data_to_json
 import yaml
-import spacy
-
-
-nlp = spacy.load("en_core_web_sm")
 
 
 def enrich_chapter_text(data: dict) -> dict:
