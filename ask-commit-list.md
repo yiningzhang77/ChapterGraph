@@ -5,9 +5,9 @@ Goal: Implement the `/ask` MVP based on `ask-plan.md` (term + chapter + LLM dial
 
 ## Progress Snapshot (2026-03-08)
 
-- Completed commits: `01`, `02`, `03`, `04`
+- Completed commits: `01`, `02`, `03`, `04`, `05`
 - In progress: `09` (added `tests/test_ask_cluster_builder.py`)
-- Remaining commits: `05`, `06`, `07`, `08`, `09` (remaining test files), `10`
+- Remaining commits: `06`, `07`, `08`, `09` (remaining test files), `10`
 
 ---
 
@@ -82,7 +82,7 @@ Verify:
 
 ---
 
-## [ ] Commit 05 - `feat(config): add LLM config template for API key`
+## [x] Commit 05 - `feat(config): add LLM config template for API key`
 
 Purpose:
 - Add a local configuration template for secrets without committing a real API key.

@@ -5,3 +5,4 @@ __pycache__/
 output
 frontend/graph-core-dist
 frontend/node_modules
+config/llm.env

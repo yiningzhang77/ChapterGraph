@@ -1,6 +1,24 @@
 import os
+from pathlib import Path
 
 from feature_achievement.llm.prompts import SYSTEM_PROMPT, build_prompt
+
+CONFIG_PATH = Path("config/llm.env")
+
+
+def _load_local_env_config() -> None:
+    if not CONFIG_PATH.exists():
+        return
+
+    for raw_line in CONFIG_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if key and key not in os.environ:
+            os.environ[key] = value
 
 
 def _extract_seed_citations(cluster: dict[str, object]) -> list[str]:
@@ -20,6 +38,7 @@ def ask_qwen(
     model: str,
     timeout_ms: int,
 ) -> str:
+    _load_local_env_config()
     provider = os.getenv("QWEN_PROVIDER", "stub").strip().lower()
     _ = (SYSTEM_PROMPT, build_prompt(query, query_type, cluster), model, timeout_ms)
 
@@ -39,4 +58,3 @@ def ask_qwen(
         )
 
     raise RuntimeError(f"Unsupported QWEN_PROVIDER: {provider}")
-
