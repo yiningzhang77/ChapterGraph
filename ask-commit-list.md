@@ -5,9 +5,9 @@ Goal: Implement the `/ask` MVP based on `ask-plan.md` (term + chapter + LLM dial
 
 ## Progress Snapshot (2026-03-08)
 
-- Completed commits: `01`, `02`, `03`, `04`, `05`
+- Completed commits: `01`, `02`, `03`, `04`, `05`, `06`
 - In progress: `09` (added `tests/test_ask_cluster_builder.py`)
-- Remaining commits: `06`, `07`, `08`, `09` (remaining test files), `10`
+- Remaining commits: `07`, `08`, `09` (remaining test files), `10`
 
 ---
 
@@ -104,7 +104,7 @@ Verify:
 
 ---
 
-## [ ] Commit 06 - `feat(vector): add pgvector schema and embedding backfill scripts`
+## [x] Commit 06 - `feat(vector): add pgvector schema and embedding backfill scripts`
 
 Purpose:
 - Introduce the “vector-first” seed search capability.
@@ -120,6 +120,10 @@ Run:
 Verify:
 - `enriched_chapter_embedding` contains data
 - `$env:PYTHONPATH='.'; pytest -q`
+
+Status note:
+- scripts are implemented and runnable
+- current local PostgreSQL is missing `pgvector` extension, so migration exits with a clear instruction
 
 ---
 
