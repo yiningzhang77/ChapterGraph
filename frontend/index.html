@@ -13,6 +13,8 @@
             --panel: rgba(255, 255, 255, 0.9);
             --panel-border: rgba(15, 23, 42, 0.12);
             --edge: rgba(100, 116, 139, 0.22);
+            --accent: #2563eb;
+            --error: #dc2626;
         }
 
         :root[data-theme="dark"] {
@@ -22,6 +24,8 @@
             --panel: rgba(15, 23, 42, 0.85);
             --panel-border: rgba(148, 163, 184, 0.2);
             --edge: rgba(148, 163, 184, 0.25);
+            --accent: #60a5fa;
+            --error: #f87171;
         }
 
         body {
@@ -29,6 +33,7 @@
             background: var(--bg);
             color: var(--text);
             font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+            overflow: hidden;
         }
 
         canvas {
@@ -63,6 +68,187 @@
             opacity: 0;
             transform: translate(8px, 8px);
             transition: opacity 120ms ease;
+        }
+
+        #askPanel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 11;
+            width: min(360px, calc(100vw - 20px));
+            max-height: calc(100vh - 20px);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--panel-border);
+            background: var(--panel);
+            backdrop-filter: blur(8px);
+            box-sizing: border-box;
+        }
+
+        .askHeader {
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .askModeRow {
+            display: flex;
+            gap: 8px;
+        }
+
+        .askModeBtn,
+        .askSubmit,
+        #themeToggle,
+        #topbar select {
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.78);
+            color: var(--text);
+            padding: 8px 10px;
+            font-size: 12px;
+        }
+
+        :root[data-theme="dark"] .askModeBtn,
+        :root[data-theme="dark"] .askSubmit,
+        :root[data-theme="dark"] #themeToggle,
+        :root[data-theme="dark"] #topbar select {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .askModeBtn.active {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .askSelectedChapter {
+            font-size: 12px;
+            opacity: 0.78;
+        }
+
+        .askSelectedChapter.hint {
+            border: 1px dashed var(--panel-border);
+            border-radius: 8px;
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.45);
+            color: var(--text);
+        }
+
+        .askSelectedChapter.hint.active {
+            border-style: solid;
+            border-color: var(--accent);
+            background: rgba(37, 99, 235, 0.08);
+        }
+
+        :root[data-theme="dark"] .askSelectedChapter.hint {
+            background: rgba(2, 6, 23, 0.35);
+        }
+
+        :root[data-theme="dark"] .askSelectedChapter.hint.active {
+            background: rgba(96, 165, 250, 0.15);
+        }
+
+        .askInput {
+            width: 100%;
+            min-height: 88px;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 10px;
+            resize: vertical;
+            background: rgba(255, 255, 255, 0.78);
+            color: var(--text);
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        :root[data-theme="dark"] .askInput {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .askSubmit {
+            cursor: pointer;
+            align-self: flex-start;
+        }
+
+        .askSubmit:disabled {
+            cursor: default;
+            opacity: 0.65;
+        }
+
+        .askError {
+            color: var(--error);
+            font-size: 12px;
+        }
+
+        .askMessages {
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 8px;
+            overflow: auto;
+            min-height: 140px;
+            max-height: 45vh;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.55);
+        }
+
+        :root[data-theme="dark"] .askMessages {
+            background: rgba(2, 6, 23, 0.35);
+        }
+
+        .askEmpty {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .askMsg {
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.72);
+        }
+
+        :root[data-theme="dark"] .askMsg {
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        .askMsg.user {
+            border-color: rgba(37, 99, 235, 0.35);
+        }
+
+        .askMeta {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+
+        .askText {
+            font-size: 12px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        @media (max-width: 900px) {
+            #topbar {
+                max-width: calc(100vw - 20px);
+                overflow: auto;
+            }
+
+            #askPanel {
+                width: calc(100vw - 20px);
+                max-height: 42vh;
+                top: auto;
+                bottom: 10px;
+            }
+
+            .askMessages {
+                max-height: 20vh;
+            }
         }
     </style>
 </head>

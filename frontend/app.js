@@ -10,6 +10,7 @@ import { reducer as coreReducer } from "./graph-core-dist/reducer.js";
 const API =
     new URLSearchParams(window.location.search).get("api") ??
     "http://127.0.0.1:8000";
+const h = React.createElement;
 
 function createInitialState() {
     return {
@@ -28,6 +29,12 @@ function createInitialState() {
 function App() {
     const [runs, setRuns] = useState([]);
     const [selectedRun, setSelectedRun] = useState("");
+    const [askMode, setAskMode] = useState("term");
+    const [askQuery, setAskQuery] = useState("");
+    const [messages, setMessages] = useState([]);
+    const [askError, setAskError] = useState("");
+    const [askLoading, setAskLoading] = useState(false);
+    const [selectedChapter, setSelectedChapter] = useState(null);
     const [state, dispatch] = useReducer(
         (currentState, action) => {
             const partial = coreReducer(currentState, action);
@@ -86,6 +93,7 @@ function App() {
     useEffect(() => {
         if (!selectedRun) return;
         dispatch({ type: "LOAD_GRAPH_START" });
+        setSelectedChapter(null);
         fetch(`${API}/graph?run_id=${selectedRun}`)
             .then((res) => res.json())
             .then((data) => {
@@ -178,15 +186,32 @@ function App() {
             });
         };
 
+        const handleClick = (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left - stateRef.current.transform.x) / stateRef.current.transform.k;
+            const y = (event.clientY - rect.top - stateRef.current.transform.y) / stateRef.current.transform.k;
+            const hit = findNodeAtPosition(stateRef.current, x, y);
+            if (!hit || hit.type !== "chapter" || !hit.chapterId) {
+                return;
+            }
+            setSelectedChapter({
+                chapterId: hit.chapterId,
+                title: hit.label,
+                bookId: hit.bookId,
+            });
+        };
+
         canvas.addEventListener("mousemove", handleMove);
         canvas.addEventListener("mouseleave", handleLeave);
         canvas.addEventListener("dblclick", handleDblClick);
+        canvas.addEventListener("click", handleClick);
 
         return () => {
             d3.select(canvas).on(".zoom", null);
             canvas.removeEventListener("mousemove", handleMove);
             canvas.removeEventListener("mouseleave", handleLeave);
             canvas.removeEventListener("dblclick", handleDblClick);
+            canvas.removeEventListener("click", handleClick);
         };
     }, []);
 
@@ -204,33 +229,233 @@ function App() {
         });
     };
 
+    const parseAskError = async (response) => {
+        let detail = `HTTP ${response.status}`;
+        try {
+            const body = await response.json();
+            if (body && typeof body.detail === "string") {
+                detail = body.detail;
+            }
+        } catch (error) {
+            detail = `HTTP ${response.status}`;
+        }
+        return detail;
+    };
+
+    const askByTerm = async (query) => {
+        const response = await fetch(`${API}/ask`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                run_id: Number(selectedRun),
+                query_type: "term",
+                query,
+                llm_enabled: true,
+                return_cluster: false,
+                return_graph_fragment: false,
+            }),
+        });
+        if (!response.ok) {
+            throw new Error(await parseAskError(response));
+        }
+        return response.json();
+    };
+
+    const askByChapter = async (query, chapterId) => {
+        const response = await fetch(`${API}/ask`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                run_id: Number(selectedRun),
+                query_type: "chapter",
+                query,
+                chapter_id: chapterId,
+                llm_enabled: true,
+                return_cluster: false,
+                return_graph_fragment: false,
+            }),
+        });
+        if (!response.ok) {
+            throw new Error(await parseAskError(response));
+        }
+        return response.json();
+    };
+
+    const onAskSubmit = async () => {
+        const query = askQuery.trim();
+        if (!selectedRun) {
+            setAskError("Please select a run first.");
+            return;
+        }
+        if (!query) {
+            setAskError("Please enter a question.");
+            return;
+        }
+        if (askMode === "chapter" && !selectedChapter?.chapterId) {
+            setAskError("Please click a chapter node before chapter ask.");
+            return;
+        }
+
+        const userMessage = {
+            role: "user",
+            text: query,
+            queryType: askMode,
+            chapterId: askMode === "chapter" ? selectedChapter.chapterId : null,
+        };
+        setMessages((prev) => [...prev, userMessage]);
+        setAskError("");
+        setAskLoading(true);
+
+        try {
+            const result = askMode === "chapter"
+                ? await askByChapter(query, selectedChapter.chapterId)
+                : await askByTerm(query);
+            const answer = typeof result.answer_markdown === "string" && result.answer_markdown.trim()
+                ? result.answer_markdown
+                : "No answer returned from /ask.";
+            setMessages((prev) => [
+                ...prev,
+                {
+                    role: "assistant",
+                    text: answer,
+                    queryType: result.query_type,
+                    chapterId: askMode === "chapter" ? selectedChapter.chapterId : null,
+                },
+            ]);
+            setAskQuery("");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to call /ask.";
+            setAskError(message);
+            setMessages((prev) => [
+                ...prev,
+                {
+                    role: "assistant",
+                    text: `Request failed: ${message}`,
+                    queryType: askMode,
+                    chapterId: askMode === "chapter" ? selectedChapter?.chapterId ?? null : null,
+                },
+            ]);
+        } finally {
+            setAskLoading(false);
+        }
+    };
+
+    const askHeaderText = askMode === "chapter"
+        ? "Chapter Ask"
+        : "Term Ask";
+
     return (
-        React.createElement(React.Fragment, null,
-            React.createElement("div", { id: "topbar" },
-                React.createElement(
+        h(React.Fragment, null,
+            h("div", { id: "topbar" },
+                h(
                     "select",
                     {
                         value: selectedRun,
                         onChange: (e) => setSelectedRun(e.target.value),
                     },
                     runs.length === 0
-                        ? React.createElement("option", { value: "" }, "failed to load runs")
+                        ? h("option", { value: "" }, "failed to load runs")
                         : runs.map((run) =>
-                            React.createElement(
+                            h(
                                 "option",
                                 { key: run.id, value: String(run.id) },
                                 `run ${run.id} (${run.book_ids.join(", ")})`,
                             ),
                         ),
                 ),
-                React.createElement(
+                h(
                     "button",
                     { id: "themeToggle", type: "button", onClick: onThemeToggle },
                     state.theme === "dark" ? "Theme: Dark" : "Theme: Light",
                 ),
             ),
-            React.createElement("canvas", { id: "graph", ref: canvasRef }),
-            React.createElement("div", { id: "tooltip", ref: tooltipRef }),
+            h("canvas", { id: "graph", ref: canvasRef }),
+            h("div", { id: "tooltip", ref: tooltipRef }),
+            h("aside", { id: "askPanel" },
+                h("div", { className: "askHeader" }, askHeaderText),
+                h("div", { className: "askModeRow" },
+                    h(
+                        "button",
+                        {
+                            type: "button",
+                            className: askMode === "term" ? "askModeBtn active" : "askModeBtn",
+                            onClick: () => setAskMode("term"),
+                        },
+                        "Ask by Term",
+                    ),
+                    h(
+                        "button",
+                        {
+                            type: "button",
+                            className: askMode === "chapter" ? "askModeBtn active" : "askModeBtn",
+                            onClick: () => setAskMode("chapter"),
+                        },
+                        "Ask by Chapter",
+                    ),
+                ),
+                askMode === "chapter"
+                    ? h(
+                        "div",
+                        {
+                            className: selectedChapter
+                                ? "askSelectedChapter hint active"
+                                : "askSelectedChapter hint",
+                        },
+                        selectedChapter
+                            ? `Selected chapter: ${selectedChapter.chapterId} (${selectedChapter.bookId})`
+                            : "Hint: click a chapter node on the graph first.",
+                    )
+                    : null,
+                h("textarea", {
+                    className: "askInput",
+                    placeholder: askMode === "chapter"
+                        ? "Ask about the selected chapter..."
+                        : "Ask about a term...",
+                    value: askQuery,
+                    onChange: (e) => setAskQuery(e.target.value),
+                    disabled: askLoading,
+                }),
+                h(
+                    "button",
+                    {
+                        type: "button",
+                        className: "askSubmit",
+                        onClick: onAskSubmit,
+                        disabled: askLoading,
+                    },
+                    askLoading ? "Asking..." : "Send",
+                ),
+                askError ? h("div", { className: "askError" }, askError) : null,
+                h(
+                    "div",
+                    { className: "askMessages" },
+                    messages.length === 0
+                        ? h("div", { className: "askEmpty" }, "No messages yet.")
+                        : messages.map((message, index) =>
+                            h(
+                                "div",
+                                {
+                                    key: `${message.role}-${index}`,
+                                    className: message.role === "assistant" ? "askMsg assistant" : "askMsg user",
+                                },
+                                h(
+                                    "div",
+                                    { className: "askMeta" },
+                                    message.role === "assistant"
+                                        ? "assistant"
+                                        : message.queryType === "chapter"
+                                            ? `chapter ${message.chapterId ?? ""}`.trim()
+                                            : "term",
+                                ),
+                                h("div", { className: "askText" }, message.text),
+                            ),
+                        ),
+                ),
+            ),
         )
     );
 }

@@ -5,9 +5,9 @@ Goal: Implement the `/ask` MVP based on `ask-plan.md` (term + chapter + LLM dial
 
 ## Progress Snapshot (2026-03-08)
 
-- Completed commits: `01`, `02`, `03`, `04`, `05`, `06`
+- Completed commits: `01`, `02`, `03`, `04`, `05`, `06`, `08`
 - In progress: `09` (added `tests/test_ask_cluster_builder.py`)
-- Remaining commits: `07`, `08`, `09` (remaining test files), `10`
+- Remaining commits: `07`, `09` (remaining test files), `10`
 
 ---
 
@@ -145,7 +145,7 @@ Verify:
 
 ---
 
-## [ ] Commit 08 - `feat(frontend): add /ask chat panel (term + chapter ask)`
+## [x] Commit 08 - `feat(frontend): add /ask chat panel (term + chapter ask)`
 
 Purpose:
 - Integrate the frontend chat panel and support both term-based and chapter-based questions.
