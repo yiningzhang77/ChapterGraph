@@ -13,6 +13,9 @@ class AskRequest(BaseModel):
     seed_top_k: int = Field(5, ge=1, le=50)
     neighbor_top_k: int = Field(40, ge=1, le=200)
     min_edge_score: float = Field(0.2, ge=0.0, le=1.0)
+    llm_enabled: bool = True
+    llm_model: str = "qwen"
+    llm_timeout_ms: int = Field(20000, ge=1000, le=120000)
     return_cluster: bool = True
     return_graph_fragment: bool = True
 
@@ -29,6 +32,7 @@ class AskResponse(BaseModel):
     query_type: str
     run_id: int
     enrichment_version: str
+    answer_markdown: str | None = None
     cluster: dict[str, object] | None = None
     graph_fragment: dict[str, object] | None = None
     meta: dict[str, object] = Field(default_factory=dict)

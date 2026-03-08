@@ -4,6 +4,7 @@ from sqlmodel import Session
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
 from feature_achievement.ask.cluster_builder import build_cluster
 from feature_achievement.db.engine import get_session
+from feature_achievement.llm.qwen_client import ask_qwen
 
 router = APIRouter(prefix="", tags=["ask"])
 
@@ -14,6 +15,19 @@ def ask(
     session: Session = Depends(get_session),
 ):
     cluster = build_cluster(session=session, req=req)
+    answer_markdown: str | None = None
+    llm_error: str | None = None
+    if req.llm_enabled:
+        try:
+            answer_markdown = ask_qwen(
+                query=req.query,
+                query_type=req.query_type,
+                cluster=cluster,
+                model=req.llm_model,
+                timeout_ms=req.llm_timeout_ms,
+            )
+        except Exception as error:
+            llm_error = str(error)
 
     graph_fragment: dict[str, object] | None = None
     if req.return_graph_fragment:
@@ -61,12 +75,17 @@ def ask(
             "edges": edges,
         }
 
+    meta: dict[str, object] = {"schema_version": "cluster.v1"}
+    if llm_error:
+        meta["llm_error"] = llm_error
+
     return AskResponse(
         query=req.query,
         query_type=req.query_type,
         run_id=req.run_id,
         enrichment_version=req.enrichment_version,
+        answer_markdown=answer_markdown,
         cluster=cluster if req.return_cluster else None,
         graph_fragment=graph_fragment,
-        meta={"schema_version": "cluster.v1"},
+        meta=meta,
     )
