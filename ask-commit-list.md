@@ -5,9 +5,9 @@ Goal: Implement the `/ask` MVP based on `ask-plan.md` (term + chapter + LLM dial
 
 ## Progress Snapshot (2026-03-08)
 
-- Completed commits: `01`, `02`, `03`, `04`, `05`, `06`, `08`
-- In progress: `09` (added `tests/test_ask_cluster_builder.py`)
-- Remaining commits: `07`, `09` (remaining test files), `10`
+- Completed commits: `01`, `02`, `03`, `04`, `05`, `06`, `08`, `09`
+- In progress: none
+- Remaining commits: `07`, `10`
 
 ---
 
@@ -162,7 +162,7 @@ Verify:
 
 ---
 
-## [ ] Commit 09 - `test(ask): add ask API/cluster/llm tests`
+## [x] Commit 09 - `test(ask): add ask API/cluster/llm tests`
 
 Purpose:
 - Prevent regressions and keep the MVP safe to iterate on.
