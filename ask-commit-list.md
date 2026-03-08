@@ -5,9 +5,9 @@ Goal: Implement the `/ask` MVP based on `ask-plan.md` (term + chapter + LLM dial
 
 ## Progress Snapshot (2026-03-08)
 
-- Completed commits: `01`, `02`, `03`, `04`, `05`, `06`, `08`, `09`
+- Completed commits: `01`, `02`, `03`, `04`, `05`, `06`, `08`, `09`, `10`
 - In progress: none
-- Remaining commits: `07`, `10`
+- Remaining commits: `07`
 
 ---
 
@@ -179,7 +179,7 @@ Verify:
 
 ---
 
-## [ ] Commit 10 - `docs(ask): update README and mark ask-plan phases completed`
+## [x] Commit 10 - `docs(ask): update README and mark ask-plan phases completed`
 
 Purpose:
 - Complete the documentation and delivery loop.

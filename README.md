@@ -1,180 +1,185 @@
-# ChapterGraph
+﻿# ChapterGraph
 
-ChapterGraph builds a retrieval-backed knowledge graph across chapters from multiple technical books, persists it in PostgreSQL, and serves it via a FastAPI backend. A lightweight frontend renders the graph on a canvas with D3, supporting expand/collapse of book clusters.
+ChapterGraph builds a retrieval-backed chapter graph from technical books and serves it through FastAPI plus a lightweight D3 canvas frontend.
 
----
+## Current MVP status
 
-## Current status (Jan 2026)
+- Graph pipeline: available (`/compute-edges`, `/runs`, `/graph`)
+- `/ask` MVP: available (term ask + chapter ask + cluster build + constrained LLM stub)
+- LLM provider: `stub` by default, configurable via `config/llm.env`
+- Vector-first seed retrieval: schema/backfill scripts are present, runtime switch is not enabled yet
 
-- Backend: FastAPI + SQLModel + PostgreSQL
-- Retrieval: TF‑IDF similarity (default) + optional sentence‑transformers embeddings
-- Frontend: JS UI shell + TypeScript graph‑core (compiled with esbuild)
-- Graph API: `/graph` returns book + chapter nodes with weighted edges
+## Project layout
 
----
-
-## Project structure (high level)
-
-```
+```text
 feature_achievement/
   api/
     main.py
-    routers/edges.py
-    routers/compute_edges_request.py
+    routers/
+      edges.py
+      ask.py
+    schemas/
+      ask.py
+  ask/
+    cluster_builder.py
+  llm/
+    prompts.py
+    qwen_client.py
   db/
     engine.py
     models.py
-    crud.py
-  retrieval/
-    candidates/
-    similarity/
-      tfidf.py
-      embedding.py
-    utils/
-      tfidf.py
-      embedding.py
-    pipeline.py
+    ask_queries.py
   scripts/
     init_db.py
-    evaluate_retrieval.py
+    normalize_enrichment_version.py
+    migrate_ask_vector.py
+    build_enriched_embeddings.py
+    smoke_ask_cluster.py
+    smoke_ask.py
 
 frontend/
   index.html
   app.js
   graph-core/
-    buildView.ts
-    reducer.ts
-    types.ts
   graph-core-dist/
-  package.json
-
-scripts/
-  run_local.ps1
 ```
 
----
+## Quick start
 
-## Backend: run
-
-Start the API server (default port 8000):
-
-```bash
-uvicorn feature_achievement.api.main:app --reload
-```
-
-Swagger UI:
-
-```
-http://127.0.0.1:8000/docs
-```
-
-Initialize DB schema (first time only):
+1. Initialize DB schema (first time only):
 
 ```bash
 python -m feature_achievement.scripts.init_db
 ```
 
----
+2. Start backend:
 
-## Frontend: build + run
+```bash
+uvicorn feature_achievement.api.main:app --reload
+```
 
-The UI shell stays in JS. The graph‑core is TypeScript and compiled with esbuild.
+3. Build frontend graph-core and start static server:
 
 ```bash
 cd frontend
-npm i -D esbuild
+npm i
 npm run build:core
 python -m http.server 5500
 ```
 
-Open:
+4. Open UI:
 
-```
-http://127.0.0.1:5500/index.html
-```
-
-Optional API base override:
-
-```
+```text
 http://127.0.0.1:5500/index.html?api=http://127.0.0.1:8000
 ```
 
----
-
-## API endpoints
-
-- POST `/compute-edges`  
-  Runs the retrieval pipeline and persists nodes/edges for a new run.
-
-- GET `/runs`  
-  List runs (latest first).
-
-- GET `/graph?run_id=...`  
-  Returns graph nodes + edges for a run.
-
-- GET `/edges?book_id=...`  
-  Query edges for a given book.
-
----
-
-## Graph response shape (simplified)
-
-```json
-{
-  "nodes": [
-    { "id": "book-id", "type": "book", "size": 18 },
-    { "id": "book-id::ch1", "type": "chapter", "book_id": "book-id", "title": "Intro" }
-  ],
-  "edges": [
-    { "source": "book-id::ch1", "target": "other::ch2", "score": 0.42, "type": "tfidf" }
-  ]
-}
-```
-
----
-
-## Embedding scorer (optional)
-
-Install sentence‑transformers:
-
-```bash
-pip install sentence-transformers
-```
-
-Use embedding similarity in `/compute-edges`:
-
-```json
-{
-  "book_ids": ["spring-in-action", "spring-start-here", "springboot-in-action"],
-  "candidate_generator": "tfidf_token",
-  "similarity": "embedding",
-  "embedding_model": "all-MiniLM-L6-v2",
-  "min_score": 0.1
-}
-```
-
----
-
-## Retrieval evaluation (score statistics)
-
-This script summarizes score distribution (overall + top‑k per source). It is **not** a ground‑truth hit‑rate metric.
-
-```bash
-python -m feature_achievement.scripts.evaluate_retrieval --run-id 3 --top-k 5
-```
-
----
-
-## One‑click local run (PowerShell)
+PowerShell one-click helper:
 
 ```powershell
 .\scripts\run_local.ps1
 ```
 
----
+## LLM config
 
-## Notes
+Copy template and fill your provider values:
 
-- Double‑click a book node to expand/collapse its chapters.
-- Chapter titles come from `/graph` and are shown in tooltips.
-- If you edit `graph-core/*.ts`, re‑run `npm run build:core`.
+```bash
+cp config/llm.env.example config/llm.env
+```
+
+`config/llm.env.example`:
+
+```env
+QWEN_PROVIDER=stub
+QWEN_BASE_URL=
+QWEN_API_KEY=
+QWEN_MODEL=qwen2.5-7b-instruct
+```
+
+Notes:
+
+- If `QWEN_PROVIDER=stub`, `/ask` always returns deterministic stub markdown.
+- If provider config is unsupported, `/ask` still returns 200 with `meta.llm_error`.
+
+## API overview
+
+- `POST /compute-edges`: compute and persist graph edges for a run
+- `GET /runs`: list runs
+- `GET /graph?run_id=...`: fetch graph for frontend rendering
+- `POST /ask`: run term/chapter retrieval + hop expansion + optional LLM answer
+
+## `/ask` request examples
+
+Term mode:
+
+```json
+{
+  "query": "Explain actuator in Spring Boot",
+  "query_type": "term",
+  "run_id": 5,
+  "enrichment_version": "v1_bullets+sections",
+  "max_hops": 2,
+  "seed_top_k": 5,
+  "neighbor_top_k": 40,
+  "min_edge_score": 0.2,
+  "llm_enabled": true,
+  "return_cluster": true,
+  "return_graph_fragment": true
+}
+```
+
+Chapter mode:
+
+```json
+{
+  "query": "Explain this chapter",
+  "query_type": "chapter",
+  "chapter_id": "springboot-in-action::ch6",
+  "run_id": 5,
+  "enrichment_version": "v1_bullets+sections",
+  "max_hops": 2,
+  "llm_enabled": true,
+  "return_cluster": true,
+  "return_graph_fragment": true
+}
+```
+
+Common error semantics:
+
+- `404`: run not found
+- `409`: request version and run version mismatch
+- `422`: no seed chapter found
+
+## Smoke scripts
+
+Cluster-only path (no LLM call):
+
+```bash
+python -m feature_achievement.scripts.smoke_ask_cluster
+```
+
+Full `/ask` MVP path (term + chapter + LLM stub):
+
+```bash
+python -m feature_achievement.scripts.smoke_ask
+```
+
+Outputs:
+
+- `tmp/ask_smoke_cluster.json`
+- `tmp/ask_smoke_response.json`
+
+## Vector schema/backfill scripts (prepared)
+
+`pgvector` must be installed in PostgreSQL first.
+
+```bash
+python -m feature_achievement.scripts.migrate_ask_vector
+python -m feature_achievement.scripts.build_enriched_embeddings
+```
+
+## Tests
+
+```powershell
+$env:PYTHONPATH='.'; pytest -q
+```
