@@ -28,8 +28,8 @@ class EnrichedChapter(SQLModel, table=True):
     order: Optional[int] = None
     title: Optional[str] = None
     chapter_text: str
-    sections: list[str] = Field(default_factory=list, sa_column=Column(JSON))
-    signals: dict = Field(default_factory=dict, sa_column=Column(JSON))
+    chapter_index_text: str = ""
+    sections: list[dict[str, object]] = Field(default_factory=list, sa_column=Column(JSON))
     enrichment_version: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
