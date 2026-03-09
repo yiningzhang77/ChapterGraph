@@ -22,7 +22,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--enrichment-version",
-        default="v1_bullets+sections",
+        default="v2_indexed_sections_bullets",
         help="Filter EnrichedChapter rows by enrichment_version.",
     )
     parser.add_argument(

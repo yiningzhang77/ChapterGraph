@@ -2,7 +2,7 @@ from sqlalchemy import text
 
 from feature_achievement.db.engine import engine
 
-TARGET_VERSION = "v1_bullets+sections"
+TARGET_VERSION = "v2_indexed_sections_bullets"
 
 
 def main() -> int:
@@ -13,7 +13,7 @@ def main() -> int:
                 UPDATE enriched_chapter
                 SET enrichment_version = :target
                 WHERE enrichment_version IS NULL
-                   OR enrichment_version IN ('v1_test', 'v1')
+                   OR enrichment_version IN ('v1_test', 'v1', 'v1_bullets+sections')
                 """
             ),
             {"target": TARGET_VERSION},
@@ -39,4 +39,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

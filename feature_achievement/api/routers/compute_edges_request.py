@@ -14,7 +14,7 @@ class SimilarityType(str, Enum):
 
 class ComputeEdgesRequest(BaseModel):
     book_ids: list[str]
-    enrichment_version: str = "v1_bullets+sections"
+    enrichment_version: str = "v2_indexed_sections_bullets"
 
     candidate_generator: CandidateGeneratorType = CandidateGeneratorType.tfidf_token
     similarity: SimilarityType = SimilarityType.embedding

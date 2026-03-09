@@ -22,7 +22,7 @@ def search_term_seed_ids_ilike(
         .where(EnrichedChapter.enrichment_version == enrichment_version)
         .where(
             or_(
-                EnrichedChapter.chapter_text.ilike(pattern),
+                EnrichedChapter.chapter_index_text.ilike(pattern),
                 EnrichedChapter.title.ilike(pattern),
             )
         )
@@ -93,4 +93,3 @@ def get_enriched_by_ids(
         .where(EnrichedChapter.id.in_(chapter_list))
     )
     return session.exec(stmt).all()
-
