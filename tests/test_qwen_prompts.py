@@ -13,7 +13,7 @@ def _cluster(seed_ids: list[str]) -> dict[str, object]:
         "query": "Actuator",
         "query_type": "term",
         "run_id": 1,
-        "enrichment_version": "v1_bullets+sections",
+        "enrichment_version": "v2_indexed_sections_bullets",
         "seed": {
             "seed_chapter_ids": seed_ids,
             "seed_reason": "term_ilike",

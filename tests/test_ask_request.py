@@ -11,8 +11,10 @@ def test_ask_request_defaults_and_query_trim() -> None:
 
     assert req.query == "Actuator"
     assert req.query_type == "term"
-    assert req.enrichment_version == "v1_bullets+sections"
+    assert req.enrichment_version == "v2_indexed_sections_bullets"
     assert req.max_hops == 2
+    assert req.section_top_k == 10
+    assert req.bullet_top_k == 20
     assert req.llm_enabled is True
     assert req.return_cluster is True
     assert req.return_graph_fragment is True

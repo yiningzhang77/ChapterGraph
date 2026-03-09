@@ -27,8 +27,8 @@ class EnrichedStub:
     book_id: str
     title: str
     chapter_text: str
-    sections: list[str]
-    signals: dict[str, object]
+    chapter_index_text: str
+    sections: list[dict[str, object]]
 
 
 def _req(**overrides: object) -> AskRequest:
@@ -36,7 +36,7 @@ def _req(**overrides: object) -> AskRequest:
         "query": "Actuator",
         "query_type": "term",
         "run_id": 1,
-        "enrichment_version": "v1_bullets+sections",
+        "enrichment_version": "v2_indexed_sections_bullets",
         "max_hops": 2,
         "seed_top_k": 5,
         "neighbor_top_k": 40,
@@ -72,7 +72,7 @@ def test_no_seed_found_raises_422(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         cluster_builder,
         "get_run",
-        lambda session, run_id: RunStub(enrichment_version="v1_bullets+sections"),
+        lambda session, run_id: RunStub(enrichment_version="v2_indexed_sections_bullets"),
     )
     monkeypatch.setattr(
         cluster_builder,
@@ -90,7 +90,7 @@ def test_successful_cluster_build(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         cluster_builder,
         "get_run",
-        lambda session, run_id: RunStub(enrichment_version="v1_bullets+sections"),
+        lambda session, run_id: RunStub(enrichment_version="v2_indexed_sections_bullets"),
     )
     monkeypatch.setattr(
         cluster_builder,
@@ -118,16 +118,48 @@ def test_successful_cluster_build(monkeypatch: pytest.MonkeyPatch) -> None:
                 book_id="book",
                 title="T1",
                 chapter_text="a",
-                sections=["s1"],
-                signals={"bullets": ["b1"]},
+                chapter_index_text="book:book chapter:book ch1 title:t1 section:s1 bullet:b1",
+                sections=[
+                    {
+                        "section_id": "book::ch1::s1",
+                        "order": 1,
+                        "title_raw": "1.1 s1",
+                        "title_norm": "s1",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch1::s1::b1",
+                                "order": 1,
+                                "text_raw": "1.1.1 b1",
+                                "text_norm": "b1",
+                                "source_refs": None,
+                            }
+                        ],
+                    }
+                ],
             ),
             EnrichedStub(
                 id="book::ch2",
                 book_id="book",
                 title="T2",
                 chapter_text="b",
-                sections=["s2"],
-                signals={"bullets": ["b2"]},
+                chapter_index_text="book:book chapter:book ch2 title:t2 section:s2 bullet:b2",
+                sections=[
+                    {
+                        "section_id": "book::ch2::s1",
+                        "order": 1,
+                        "title_raw": "2.1 s2",
+                        "title_norm": "s2",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch2::s1::b1",
+                                "order": 1,
+                                "text_raw": "2.1.1 b2",
+                                "text_norm": "b2",
+                                "source_refs": None,
+                            }
+                        ],
+                    }
+                ],
             ),
         ],
     )
@@ -149,4 +181,11 @@ def test_successful_cluster_build(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(edges, list)
     assert len(chapters) == 2
     assert len(edges) == 1
-
+    evidence = cluster["evidence"]
+    assert isinstance(evidence, dict)
+    sections = evidence["sections"]
+    bullets = evidence["bullets"]
+    assert isinstance(sections, list)
+    assert isinstance(bullets, list)
+    assert len(sections) > 0
+    assert len(bullets) > 0

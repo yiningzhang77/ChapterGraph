@@ -89,7 +89,7 @@ def test_ask_api_term_flow_success_with_llm(
             "query": "Actuator",
             "query_type": "term",
             "run_id": 7,
-            "enrichment_version": "v1_bullets+sections",
+            "enrichment_version": "v2_indexed_sections_bullets",
             "seed": {"seed_chapter_ids": ["spring::ch1"], "seed_reason": "term_ilike"},
             "chapters": [
                 {
@@ -97,9 +97,30 @@ def test_ask_api_term_flow_success_with_llm(
                     "book_id": "spring",
                     "title": "Actuator",
                     "chapter_text": "text",
+                    "chapter_index_text": "index",
                 }
             ],
             "edges": [],
+            "evidence": {
+                "sections": [
+                    {
+                        "chapter_id": "spring::ch1",
+                        "section_id": "spring::ch1::s1",
+                        "title_norm": "actuator",
+                        "score": 1.0,
+                    }
+                ],
+                "bullets": [
+                    {
+                        "chapter_id": "spring::ch1",
+                        "section_id": "spring::ch1::s1",
+                        "bullet_id": "spring::ch1::s1::b1",
+                        "text_norm": "actuator endpoint",
+                        "score": 1.0,
+                        "source_refs": None,
+                    }
+                ],
+            },
             "constraints": {},
         }
 
@@ -130,6 +151,7 @@ def test_ask_api_term_flow_success_with_llm(
     assert body["answer_markdown"] == "answer ok"
     assert body["query_type"] == "term"
     assert body["meta"]["schema_version"] == "cluster.v1"
+    assert body["evidence"]["bullets"][0]["source_refs"] is None
     assert body["graph_fragment"]["nodes"] == [
         {"id": "spring::ch1", "book_id": "spring", "title": "Actuator"}
     ]
@@ -152,7 +174,7 @@ def test_ask_api_chapter_flow_success(
             "query": "Explain selected chapter",
             "query_type": "chapter",
             "run_id": 7,
-            "enrichment_version": "v1_bullets+sections",
+            "enrichment_version": "v2_indexed_sections_bullets",
             "seed": {"seed_chapter_ids": ["spring::ch2"], "seed_reason": "chapter_selected"},
             "chapters": [
                 {
@@ -160,9 +182,11 @@ def test_ask_api_chapter_flow_success(
                     "book_id": "spring",
                     "title": "Data Binding",
                     "chapter_text": "text",
+                    "chapter_index_text": "index",
                 }
             ],
             "edges": [],
+            "evidence": {"sections": [], "bullets": []},
             "constraints": {},
         }
 
@@ -183,6 +207,7 @@ def test_ask_api_chapter_flow_success(
     body = response.json()
     assert body["query_type"] == "chapter"
     assert body["cluster"]["seed"]["seed_reason"] == "chapter_selected"
+    assert body["evidence"] == {"sections": [], "bullets": []}
     assert body["graph_fragment"] is None
     req = captured["req"]
     assert req.query_type == "chapter"
@@ -199,10 +224,11 @@ def test_ask_api_records_llm_error_in_meta(
             "query": "Actuator",
             "query_type": "term",
             "run_id": 7,
-            "enrichment_version": "v1_bullets+sections",
+            "enrichment_version": "v2_indexed_sections_bullets",
             "seed": {"seed_chapter_ids": ["spring::ch1"], "seed_reason": "term_ilike"},
             "chapters": [],
             "edges": [],
+            "evidence": {"sections": [], "bullets": []},
             "constraints": {},
         }
 
