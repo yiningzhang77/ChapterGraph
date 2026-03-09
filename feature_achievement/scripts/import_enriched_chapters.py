@@ -7,6 +7,7 @@ from sqlmodel import Session
 
 from feature_achievement.db.engine import engine
 from feature_achievement.db.crud import persist_enriched_chapters
+from feature_achievement.scripts.validate_enriched_v2 import validate_enriched_book
 
 """
 Raw content
@@ -55,6 +56,17 @@ def main() -> int:
     enriched_books = list(iter_enriched_books(args.config, args.output_dir))
     if not enriched_books:
         print("No enriched JSON found. Run enrichment first.")
+        return 1
+
+    validation_errors: list[str] = []
+    for book in enriched_books:
+        validation_errors.extend(
+            validate_enriched_book(book, source_name=str(book.get("book_id", "unknown")))
+        )
+    if validation_errors:
+        print("validation failed: enriched JSON is not v2 compatible")
+        for error in validation_errors:
+            print(f"- {error}")
         return 1
 
     with Session(engine) as session:

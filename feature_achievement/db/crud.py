@@ -78,8 +78,8 @@ def persist_enriched_chapters(
                 "order": ch.get("order"),
                 "title": ch.get("title"),
                 "chapter_text": ch.get("chapter_text", ""),
+                "chapter_index_text": ch.get("chapter_index_text", ch.get("chapter_text", "")),
                 "sections": ch.get("sections", []),
-                "signals": ch.get("signals", {}),
                 "enrichment_version": enrichment_version,
             }
 
