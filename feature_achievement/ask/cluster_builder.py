@@ -1,4 +1,5 @@
 from collections import OrderedDict
+import re
 
 from fastapi import HTTPException
 from sqlmodel import Session
@@ -17,6 +18,23 @@ def _truncate_text(text: str, limit: int = 1200) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 3] + "..."
+
+
+def _normalize_text(value: str) -> str:
+    text = value.strip().lower()
+    text = re.sub(r"[^a-z0-9\s]+", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def _score_text(query_tokens: set[str], candidate: str) -> float:
+    if not query_tokens:
+        return 0.0
+    candidate_tokens = set(_normalize_text(candidate).split())
+    if not candidate_tokens:
+        return 0.0
+    overlap = len(query_tokens.intersection(candidate_tokens))
+    return overlap / len(query_tokens)
 
 
 def _pick_seed_ids(session: Session, req: AskRequest) -> tuple[list[str], str]:
@@ -38,6 +56,106 @@ def _pick_seed_ids(session: Session, req: AskRequest) -> tuple[list[str], str]:
         limit=req.seed_top_k,
     )
     return term_ids, "term_ilike"
+
+
+def _section_title(section: dict[str, object]) -> str:
+    title_norm = section.get("title_norm")
+    if isinstance(title_norm, str) and title_norm.strip():
+        return title_norm
+    title_raw = section.get("title_raw")
+    if isinstance(title_raw, str):
+        return title_raw
+    return ""
+
+
+def _build_evidence(chapters: list[dict[str, object]], req: AskRequest) -> dict[str, object]:
+    query_tokens = set(_normalize_text(req.query).split())
+    section_rows: list[dict[str, object]] = []
+    bullet_rows: list[dict[str, object]] = []
+
+    for chapter in chapters:
+        chapter_id = chapter.get("chapter_id")
+        sections_value = chapter.get("sections")
+        if not isinstance(chapter_id, str) or not isinstance(sections_value, list):
+            continue
+
+        for section in sections_value:
+            if not isinstance(section, dict):
+                continue
+
+            section_id = section.get("section_id")
+            if not isinstance(section_id, str):
+                continue
+
+            section_title = _section_title(section)
+            section_score = _score_text(query_tokens, section_title)
+
+            bullets_value = section.get("bullets")
+            bullet_max_score = 0.0
+            if isinstance(bullets_value, list):
+                for bullet in bullets_value:
+                    if not isinstance(bullet, dict):
+                        continue
+                    bullet_id = bullet.get("bullet_id")
+                    if not isinstance(bullet_id, str):
+                        continue
+
+                    text_norm = bullet.get("text_norm")
+                    text_raw = bullet.get("text_raw")
+                    bullet_text = text_norm if isinstance(text_norm, str) else (
+                        text_raw if isinstance(text_raw, str) else ""
+                    )
+                    score = _score_text(query_tokens, bullet_text)
+                    if score > bullet_max_score:
+                        bullet_max_score = score
+
+                    source_refs = bullet.get("source_refs")
+                    if source_refs is not None and not isinstance(source_refs, list):
+                        source_refs = None
+
+                    bullet_rows.append(
+                        {
+                            "chapter_id": chapter_id,
+                            "section_id": section_id,
+                            "bullet_id": bullet_id,
+                            "text_norm": text_norm,
+                            "text_raw": text_raw,
+                            "score": score,
+                            "source_refs": source_refs,
+                        }
+                    )
+
+            combined_score = section_score * 0.7 + bullet_max_score * 0.3
+            section_rows.append(
+                {
+                    "chapter_id": chapter_id,
+                    "section_id": section_id,
+                    "title_norm": section.get("title_norm"),
+                    "title_raw": section.get("title_raw"),
+                    "score": combined_score,
+                }
+            )
+
+    section_rows.sort(
+        key=lambda row: (
+            -float(row.get("score", 0.0)),
+            str(row.get("chapter_id", "")),
+            str(row.get("section_id", "")),
+        )
+    )
+    bullet_rows.sort(
+        key=lambda row: (
+            -float(row.get("score", 0.0)),
+            str(row.get("chapter_id", "")),
+            str(row.get("section_id", "")),
+            str(row.get("bullet_id", "")),
+        )
+    )
+
+    return {
+        "sections": section_rows[: req.section_top_k],
+        "bullets": bullet_rows[: req.bullet_top_k],
+    }
 
 
 def build_cluster(session: Session, req: AskRequest) -> dict[str, object]:
@@ -113,6 +231,8 @@ def build_cluster(session: Session, req: AskRequest) -> dict[str, object]:
                 "book_id": row.book_id,
                 "title": row.title,
                 "chapter_text": _truncate_text(row.chapter_text or ""),
+                "chapter_index_text": _truncate_text(row.chapter_index_text or ""),
+                "sections": row.sections,
             }
         )
 
@@ -130,6 +250,19 @@ def build_cluster(session: Session, req: AskRequest) -> dict[str, object]:
         and edge["to"] in visible_ids
     ]
 
+    evidence = _build_evidence(chapters, req)
+
+    chapter_payload = [
+        {
+            "chapter_id": chapter["chapter_id"],
+            "book_id": chapter["book_id"],
+            "title": chapter["title"],
+            "chapter_text": chapter["chapter_text"],
+            "chapter_index_text": chapter["chapter_index_text"],
+        }
+        for chapter in chapters
+    ]
+
     return {
         "schema_version": "cluster.v1",
         "query": req.query,
@@ -140,12 +273,15 @@ def build_cluster(session: Session, req: AskRequest) -> dict[str, object]:
             "seed_chapter_ids": seed_ids,
             "seed_reason": seed_reason,
         },
-        "chapters": chapters,
+        "chapters": chapter_payload,
         "edges": filtered_edges,
+        "evidence": evidence,
         "constraints": {
             "max_hops": req.max_hops,
             "seed_top_k": req.seed_top_k,
             "neighbor_top_k": req.neighbor_top_k,
             "min_edge_score": req.min_edge_score,
+            "section_top_k": req.section_top_k,
+            "bullet_top_k": req.bullet_top_k,
         },
     }

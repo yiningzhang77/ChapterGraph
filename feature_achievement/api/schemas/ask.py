@@ -7,11 +7,13 @@ class AskRequest(BaseModel):
     query: str = Field(..., min_length=1)
     query_type: Literal["term", "chapter"] = "term"
     run_id: int
-    enrichment_version: str = "v1_bullets+sections"
+    enrichment_version: str = "v2_indexed_sections_bullets"
     chapter_id: str | None = None
     max_hops: int = Field(2, ge=0, le=2)
     seed_top_k: int = Field(5, ge=1, le=50)
     neighbor_top_k: int = Field(40, ge=1, le=200)
+    section_top_k: int = Field(10, ge=1, le=100)
+    bullet_top_k: int = Field(20, ge=1, le=200)
     min_edge_score: float = Field(0.2, ge=0.0, le=1.0)
     llm_enabled: bool = True
     llm_model: str = "qwen"
@@ -34,5 +36,6 @@ class AskResponse(BaseModel):
     enrichment_version: str
     answer_markdown: str | None = None
     cluster: dict[str, object] | None = None
+    evidence: dict[str, object] | None = None
     graph_fragment: dict[str, object] | None = None
     meta: dict[str, object] = Field(default_factory=dict)

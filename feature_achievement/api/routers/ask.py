@@ -15,6 +15,9 @@ def ask(
     session: Session = Depends(get_session),
 ):
     cluster = build_cluster(session=session, req=req)
+    evidence = cluster.get("evidence") if isinstance(cluster.get("evidence"), dict) else None
+    cluster_payload = dict(cluster)
+    cluster_payload.pop("evidence", None)
     answer_markdown: str | None = None
     llm_error: str | None = None
     if req.llm_enabled:
@@ -22,7 +25,7 @@ def ask(
             answer_markdown = ask_qwen(
                 query=req.query,
                 query_type=req.query_type,
-                cluster=cluster,
+                cluster=cluster_payload,
                 model=req.llm_model,
                 timeout_ms=req.llm_timeout_ms,
             )
@@ -31,8 +34,8 @@ def ask(
 
     graph_fragment: dict[str, object] | None = None
     if req.return_graph_fragment:
-        chapter_entries = cluster.get("chapters")
-        edge_entries = cluster.get("edges")
+        chapter_entries = cluster_payload.get("chapters")
+        edge_entries = cluster_payload.get("edges")
 
         nodes: list[dict[str, object]] = []
         if isinstance(chapter_entries, list):
@@ -85,7 +88,8 @@ def ask(
         run_id=req.run_id,
         enrichment_version=req.enrichment_version,
         answer_markdown=answer_markdown,
-        cluster=cluster if req.return_cluster else None,
+        cluster=cluster_payload if req.return_cluster else None,
+        evidence=evidence,
         graph_fragment=graph_fragment,
         meta=meta,
     )
