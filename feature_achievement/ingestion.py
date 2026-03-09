@@ -1,10 +1,10 @@
 import json
 import os
+import re
 
 ROLE_CHAPTER = "chapter"
 ROLE_SECTION = "section"
 ROLE_BULLET = "bullet"
-
 
 CHAPTER_INT = "int"
 CHAPTER_CHAPTER = "Chapter"
@@ -24,10 +24,8 @@ SECTION_RULE = {
 }
 
 BULET_RULE = {
-    "no_bullet_title": lambda tokens: not tokens[0]
-    .replace(".", "")
-    .isdigit(),  # Using ....
-    "is_single": lambda tokens: tokens[0].count(".") == 2,  # 12.2.3
+    "no_bullet_title": lambda tokens: not tokens[0].replace(".", "").isdigit(),
+    "is_single": lambda tokens: tokens[0].count(".") == 2,
 }
 
 RULE = {
@@ -41,6 +39,7 @@ def detect_chapter_type(tokens, rule=CHAPTER_RULE):
         return CHAPTER_INT
     if rule["is_keyword_chapter"](tokens):
         return CHAPTER_CHAPTER
+    return None
 
 
 def detect_section_type(tokens, rule=SECTION_RULE):
@@ -48,6 +47,7 @@ def detect_section_type(tokens, rule=SECTION_RULE):
         return SECTION_HAS_PAGE
     if rule["no_page"](tokens):
         return SECTION_NO_PAGE
+    return None
 
 
 def detect_bullet_type(tokens, rule=BULET_RULE):
@@ -55,6 +55,7 @@ def detect_bullet_type(tokens, rule=BULET_RULE):
         return BULLET_MIX
     if rule["is_single"](tokens):
         return BULLET_SINGLE
+    return None
 
 
 def detect_role(tokens, rule=RULE):
@@ -65,61 +66,104 @@ def detect_role(tokens, rule=RULE):
     return ROLE_BULLET
 
 
-# def add_keywords()
+def _normalize_text(value: str) -> str:
+    text = value.strip().lower()
+    text = re.sub(r"^\d+\.\d+\.\d+\s+", "", text)
+    text = re.sub(r"^\d+\.\d+\s+", "", text)
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def _create_section(chapter: dict, title_raw: str, title_norm: str) -> dict:
+    section_order = len(chapter["sections"]) + 1
+    section = {
+        "section_id": f"{chapter['id']}::s{section_order}",
+        "order": section_order,
+        "title_raw": title_raw,
+        "title_norm": title_norm,
+        "bullets": [],
+    }
+    chapter["sections"].append(section)
+    return section
+
+
+def _append_bullet(section: dict, text_raw: str) -> None:
+    text_norm = _normalize_text(text_raw)
+    if not text_norm:
+        return
+    bullet_order = len(section["bullets"]) + 1
+    section["bullets"].append(
+        {
+            "bullet_id": f"{section['section_id']}::b{bullet_order}",
+            "order": bullet_order,
+            "text_raw": text_raw.strip(),
+            "text_norm": text_norm,
+            "source_refs": None,
+        }
+    )
+
+
 def create_chapter(tokens, book_name, chapters):
     chapter_type = detect_chapter_type(tokens)
     if chapter_type == CHAPTER_INT:
-        # ch_order = int(tokens[0])
         chapter = {
             "id": f"{book_name}::ch{tokens[0]}",
             "order": int(tokens[0]),
             "title": " ".join(tokens[1:-1]),
             "sections": [],
-            "signals": {"bullets": [], "raw_text": ""},
         }
         chapters.append(chapter)
         return chapter
-    elif chapter_type == CHAPTER_CHAPTER:
-        # ch_order = int(tokens[1])
+    if chapter_type == CHAPTER_CHAPTER:
         chapter = {
             "id": f"{book_name}::ch{tokens[1]}",
             "order": int(tokens[1]),
             "title": " ".join(tokens[2:]),
             "sections": [],
-            "signals": {"bullets": [], "raw_text": ""},
         }
         chapters.append(chapter)
         return chapter
+    return None
 
 
 def create_section(chapter, tokens):
     section_type = detect_section_type(tokens)
     if section_type == SECTION_HAS_PAGE:
-        section_title = " ".join(tokens[1:-1])
-        chapter["sections"].append(section_title)
-        return chapter
-    elif section_type == SECTION_NO_PAGE:
-        section_title = " ".join(tokens[1:])
-        chapter["sections"].append(section_title)
-        return chapter
+        title_raw = " ".join(tokens[:-1])
+        title_norm = _normalize_text(" ".join(tokens[1:-1]))
+        return _create_section(chapter, title_raw=title_raw, title_norm=title_norm)
+    if section_type == SECTION_NO_PAGE:
+        title_raw = " ".join(tokens)
+        title_norm = _normalize_text(" ".join(tokens[1:]))
+        return _create_section(chapter, title_raw=title_raw, title_norm=title_norm)
+    return None
 
 
-def create_bullet(chapter, tokens, current_bullet):
+def _get_or_create_unscoped_section(chapter: dict) -> dict:
+    if chapter["sections"]:
+        return chapter["sections"][-1]
+    return _create_section(
+        chapter,
+        title_raw=f"{chapter['order']}.0 Unscoped",
+        title_norm="unscoped",
+    )
+
+
+def create_bullet(section, tokens, current_bullet):
     bullet_type = detect_bullet_type(tokens)
     if bullet_type == BULLET_MIX:
         for token in tokens:
             if token.isdigit():
                 if current_bullet.strip():
-                    chapter["signals"]["bullets"].append(current_bullet.strip())
+                    _append_bullet(section, current_bullet)
                 current_bullet = ""
                 break
-            else:
-                current_bullet += token + " "
+            current_bullet += token + " "
     elif bullet_type == BULLET_SINGLE:
         for token in tokens:
             current_bullet += token + " "
         clean_bullet = " ".join(current_bullet.split()[1:])
-        chapter["signals"]["bullets"].append(clean_bullet)
+        _append_bullet(section, clean_bullet)
         current_bullet = ""
 
     return current_bullet
@@ -143,7 +187,9 @@ def load_content_to_data(content_path, book_name, rule=RULE):
     }
 
     chapter = None
-    current_bullet = ""  # bullet 缓冲区在「行循环外」-> bullet 是可能跨行的
+    current_section = None
+    current_bullet = ""
+
     for line in content_lines:
         line = line.strip()
         if not line:
@@ -153,21 +199,36 @@ def load_content_to_data(content_path, book_name, rule=RULE):
         role = detect_role(tokens, rule)
 
         if role == ROLE_CHAPTER:
+            if chapter is not None and current_section is not None and current_bullet.strip():
+                _append_bullet(current_section, current_bullet)
+            current_bullet = ""
             chapter_type = detect_chapter_type(tokens)
-            parser_meta["chapter_types"].add(chapter_type)
+            if chapter_type is not None:
+                parser_meta["chapter_types"].add(chapter_type)
             chapter = create_chapter(tokens, book_name, chapters=chapters)
+            current_section = None
         elif role == ROLE_SECTION:
             if chapter is None:
                 continue
+            if current_section is not None and current_bullet.strip():
+                _append_bullet(current_section, current_bullet)
+                current_bullet = ""
             section_type = detect_section_type(tokens)
-            parser_meta["section_types"].add(section_type)
-            chapter = create_section(chapter, tokens)
+            if section_type is not None:
+                parser_meta["section_types"].add(section_type)
+            current_section = create_section(chapter, tokens)
         elif role == ROLE_BULLET:
             if chapter is None:
                 continue
             bullet_type = detect_bullet_type(tokens)
-            parser_meta["bullet_types"].add(bullet_type)
-            current_bullet = create_bullet(chapter, tokens, current_bullet)
+            if bullet_type is not None:
+                parser_meta["bullet_types"].add(bullet_type)
+            current_section = current_section or _get_or_create_unscoped_section(chapter)
+            current_bullet = create_bullet(current_section, tokens, current_bullet)
+
+    if chapter is not None and current_section is not None and current_bullet.strip():
+        _append_bullet(current_section, current_bullet)
+
     return chapters, parser_meta
 
 
