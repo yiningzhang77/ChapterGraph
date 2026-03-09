@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from feature_achievement.api.main import app
 
 KNOWN_TERMS = ["Actuator", "Spring", "Security", "Data"]
-TARGET_VERSION = "v1_bullets+sections"
+TARGET_VERSION = "v2_indexed_sections_bullets"
 OUTPUT_PATH = Path("tmp/ask_smoke_response.json")
 
 
@@ -49,12 +49,28 @@ def _validate_cluster(response_body: dict[str, object]) -> dict[str, object]:
     seed = cluster.get("seed")
     chapters = cluster.get("chapters")
     edges = cluster.get("edges")
+    evidence = response_body.get("evidence")
+    if evidence is None:
+        evidence = cluster.get("evidence")
     if not isinstance(seed, dict):
         raise RuntimeError("Malformed cluster: seed must be an object.")
     if not isinstance(chapters, list):
         raise RuntimeError("Malformed cluster: chapters must be a list.")
     if not isinstance(edges, list):
         raise RuntimeError("Malformed cluster: edges must be a list.")
+    if not isinstance(evidence, dict):
+        raise RuntimeError("Malformed cluster: evidence must be an object.")
+    evidence_sections = evidence.get("sections")
+    evidence_bullets = evidence.get("bullets")
+    if not isinstance(evidence_sections, list):
+        raise RuntimeError("Malformed cluster: evidence.sections must be a list.")
+    if not isinstance(evidence_bullets, list):
+        raise RuntimeError("Malformed cluster: evidence.bullets must be a list.")
+    for bullet in evidence_bullets:
+        if not isinstance(bullet, dict):
+            raise RuntimeError("Malformed cluster: evidence bullet entry must be an object.")
+        if "source_refs" not in bullet:
+            raise RuntimeError("Malformed cluster: evidence bullet missing source_refs key.")
     if len(chapters) == 0:
         raise RuntimeError("Cluster has no chapters.")
 
@@ -132,11 +148,33 @@ def main() -> int:
 
         term_chapter_count = len(term_cluster.get("chapters", []))
         term_edge_count = len(term_cluster.get("edges", []))
+        term_evidence = term_response.get("evidence")
+        if term_evidence is None:
+            term_evidence = term_cluster.get("evidence")
+        term_section_count = 0
+        term_bullet_count = 0
+        if isinstance(term_evidence, dict):
+            sections = term_evidence.get("sections")
+            bullets = term_evidence.get("bullets")
+            term_section_count = len(sections) if isinstance(sections, list) else 0
+            term_bullet_count = len(bullets) if isinstance(bullets, list) else 0
         chapter_chapter_count = len(chapter_cluster.get("chapters", []))
         chapter_edge_count = len(chapter_cluster.get("edges", []))
+        chapter_evidence = chapter_response.get("evidence")
+        if chapter_evidence is None:
+            chapter_evidence = chapter_cluster.get("evidence")
+        chapter_section_count = 0
+        chapter_bullet_count = 0
+        if isinstance(chapter_evidence, dict):
+            sections = chapter_evidence.get("sections")
+            bullets = chapter_evidence.get("bullets")
+            chapter_section_count = len(sections) if isinstance(sections, list) else 0
+            chapter_bullet_count = len(bullets) if isinstance(bullets, list) else 0
 
         print(f"term_cluster chapters={term_chapter_count} edges={term_edge_count}")
+        print(f"term_cluster evidence_sections={term_section_count} evidence_bullets={term_bullet_count}")
         print(f"chapter_cluster chapters={chapter_chapter_count} edges={chapter_edge_count}")
+        print(f"chapter_cluster evidence_sections={chapter_section_count} evidence_bullets={chapter_bullet_count}")
 
         term_answer = term_response.get("answer_markdown")
         chapter_answer = chapter_response.get("answer_markdown")

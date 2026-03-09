@@ -10,7 +10,7 @@ from feature_achievement.db.engine import engine
 from feature_achievement.db.models import Run
 
 KNOWN_TERMS = ["Actuator", "Spring", "Security", "Data"]
-TARGET_VERSION = "v1_bullets+sections"
+TARGET_VERSION = "v2_indexed_sections_bullets"
 OUTPUT_PATH = Path("tmp/ask_smoke_cluster.json")
 
 
@@ -36,6 +36,7 @@ def _validate_cluster(cluster: dict[str, object]) -> tuple[int, int, int]:
         "seed",
         "chapters",
         "edges",
+        "evidence",
         "constraints",
     }
     missing = [key for key in required_keys if key not in cluster]
@@ -57,16 +58,32 @@ def _validate_cluster(cluster: dict[str, object]) -> tuple[int, int, int]:
     edges = cluster.get("edges")
     if not isinstance(edges, list):
         raise RuntimeError("Cluster malformed: edges is not a list")
+    evidence = cluster.get("evidence")
+    if not isinstance(evidence, dict):
+        raise RuntimeError("Cluster malformed: evidence is not an object")
+    evidence_sections = evidence.get("sections")
+    evidence_bullets = evidence.get("bullets")
+    if not isinstance(evidence_sections, list):
+        raise RuntimeError("Cluster malformed: evidence.sections is not a list")
+    if not isinstance(evidence_bullets, list):
+        raise RuntimeError("Cluster malformed: evidence.bullets is not a list")
+    for bullet in evidence_bullets:
+        if not isinstance(bullet, dict):
+            raise RuntimeError("Cluster malformed: evidence bullet entry is not an object")
+        if "source_refs" not in bullet:
+            raise RuntimeError("Cluster malformed: evidence bullet missing source_refs key")
 
     seed_count = len(seed_ids)
     chapter_count = len(chapters)
     edge_count = len(edges)
+    evidence_section_count = len(evidence_sections)
+    evidence_bullet_count = len(evidence_bullets)
 
     if seed_count == 0:
         raise RuntimeError("Cluster invalid: empty seed list")
     if chapter_count == 0:
         raise RuntimeError("Cluster invalid: empty chapter list")
-    return seed_count, chapter_count, edge_count
+    return seed_count, chapter_count, edge_count, evidence_section_count, evidence_bullet_count
 
 
 def _print_cluster_summary(cluster: dict[str, object]) -> None:
@@ -75,6 +92,7 @@ def _print_cluster_summary(cluster: dict[str, object]) -> None:
     seed = cluster.get("seed")
     chapters = cluster.get("chapters")
     edges = cluster.get("edges")
+    evidence = cluster.get("evidence")
     constraints = cluster.get("constraints")
 
     print("cluster_summary:")
@@ -97,6 +115,7 @@ def _print_cluster_summary(cluster: dict[str, object]) -> None:
         print("    - invalid chapters payload")
 
     print(f"  edges: {edges}")
+    print(f"  evidence: {evidence}")
     print(f"  constraints: {constraints}")
 
 
@@ -125,11 +144,13 @@ def main() -> int:
             )
             try:
                 cluster = build_cluster(session=session, req=req)
-                seed_count, chapter_count, edge_count = _validate_cluster(cluster)
+                seed_count, chapter_count, edge_count, evidence_section_count, evidence_bullet_count = _validate_cluster(cluster)
                 print(f"term={term}")
                 print(f"seed_count={seed_count}")
                 print(f"chapter_count={chapter_count}")
                 print(f"edge_count={edge_count}")
+                print(f"evidence_section_count={evidence_section_count}")
+                print(f"evidence_bullet_count={evidence_bullet_count}")
                 _print_cluster_summary(cluster)
                 _write_cluster_file(cluster)
                 print("smoke passed")

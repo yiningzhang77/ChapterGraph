@@ -101,6 +101,16 @@ Notes:
 - If `QWEN_PROVIDER=stub`, `/ask` always returns deterministic stub markdown.
 - If provider config is unsupported, `/ask` still returns 200 with `meta.llm_error`.
 
+## Enrichment v2 runbook
+
+```bash
+python -m feature_achievement.scripts.migrate_enriched_shape_v2
+python -m feature_achievement.scripts.validate_enriched_v2
+python -m feature_achievement.scripts.migrate_enriched_v2_schema
+python -m feature_achievement.scripts.import_enriched_chapters --overwrite
+python -m feature_achievement.scripts.normalize_enrichment_version
+```
+
 ## API overview
 
 - `POST /compute-edges`: compute and persist graph edges for a run
@@ -117,7 +127,7 @@ Term mode:
   "query": "Explain actuator in Spring Boot",
   "query_type": "term",
   "run_id": 5,
-  "enrichment_version": "v1_bullets+sections",
+  "enrichment_version": "v2_indexed_sections_bullets",
   "max_hops": 2,
   "seed_top_k": 5,
   "neighbor_top_k": 40,
@@ -136,7 +146,7 @@ Chapter mode:
   "query_type": "chapter",
   "chapter_id": "springboot-in-action::ch6",
   "run_id": 5,
-  "enrichment_version": "v1_bullets+sections",
+  "enrichment_version": "v2_indexed_sections_bullets",
   "max_hops": 2,
   "llm_enabled": true,
   "return_cluster": true,
@@ -151,6 +161,19 @@ Common error semantics:
 - `422`: no seed chapter found
 
 ## Smoke scripts
+
+Before `/ask` smoke on a fresh DB, normalize version labels once:
+
+```bash
+python -m feature_achievement.scripts.normalize_enrichment_version
+```
+
+Validate enriched v2 shape:
+
+```bash
+python -m feature_achievement.scripts.validate_enriched_v2
+python -m feature_achievement.scripts.smoke_enriched_v2
+```
 
 Cluster-only path (no LLM call):
 
