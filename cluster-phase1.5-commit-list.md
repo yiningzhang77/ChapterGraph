@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`
+- Completed: `01`, `02`, `03`, `04`
 - In progress: none
 
 ---
@@ -79,7 +79,7 @@ Verify:
 
 ---
 
-## [ ] Commit 04 - `feat(epub-source-refs): build source_refs with confidence and deterministic schema`
+## [x] Commit 04 - `feat(epub-source-refs): build source_refs with confidence and deterministic schema`
 
 Purpose:
 - Generate `source_refs` objects from resolved slices.
