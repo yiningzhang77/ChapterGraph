@@ -1,3 +1,4 @@
+from feature_achievement.epub.adapter import AdaptedPayload, ParseMetrics, build_adapter_payload
 from feature_achievement.epub.content import (
     AnchorSlice,
     clean_extracted_text,
@@ -22,11 +23,14 @@ from feature_achievement.epub.source_refs import (
 )
 
 __all__ = [
+    "AdaptedPayload",
     "AnchorSlice",
+    "ParseMetrics",
     "ProbeResult",
     "SOURCE_REF_FORMAT",
     "SourceRef",
     "TocNode",
+    "build_adapter_payload",
     "build_source_ref",
     "build_source_refs_for_range",
     "build_source_refs_for_range_from_epub",

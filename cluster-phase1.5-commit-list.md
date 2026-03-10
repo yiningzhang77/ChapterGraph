@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`, `04`
+- Completed: `01`, `02`, `03`, `04`, `05`
 - In progress: none
 
 ---
@@ -95,7 +95,7 @@ Verify:
 
 ---
 
-## [ ] Commit 05 - `feat(epub-adapter): add parser router and unified adapter entry`
+## [x] Commit 05 - `feat(epub-adapter): add parser router and unified adapter entry`
 
 Purpose:
 - Wire probe + outline + content + source_refs into one adapter pipeline.
