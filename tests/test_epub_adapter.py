@@ -84,3 +84,22 @@ def test_adapter_can_include_appendix_when_enabled() -> None:
 
     assert len(payload_default["chapters"]) == 8
     assert len(payload_with_appendix["chapters"]) == 12
+
+
+def test_adapter_type_c_distributes_sections_across_chapters() -> None:
+    springboot_path = _first_epub("springboot_in_action")
+    payload = build_adapter_payload(
+        epub_path=springboot_path,
+        book_id="springboot-in-action",
+    )
+
+    chapters = payload["chapters"]
+    section_counts: list[int] = []
+    for chapter in chapters:
+        sections_obj = chapter.get("sections")
+        sections = sections_obj if isinstance(sections_obj, list) else []
+        section_counts.append(len(sections))
+
+    assert len(chapters) == 8
+    assert all(count > 0 for count in section_counts)
+    assert section_counts[-1] <= 10

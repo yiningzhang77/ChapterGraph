@@ -309,13 +309,32 @@ def _extract_type_c(zip_file: ZipFile, probe_result: ProbeResult) -> list[TocNod
             if _CHAPTER_TEXT_FILE_RE.search(file_path)
         ]
 
-    heading_nodes: list[TocNode] = []
+    heading_nodes_by_file: dict[str, list[TocNode]] = {}
     for chapter_file in chapter_files:
-        for node in _scan_body_headings(zip_file, chapter_file):
-            if node.level >= 2:
-                heading_nodes.append(node)
+        heading_nodes_by_file[chapter_file] = [
+            node
+            for node in _scan_body_headings(zip_file, chapter_file)
+            if node.level >= 2
+        ]
 
-    return _dedupe_nodes(base_nodes + heading_nodes)
+    ordered_nodes: list[TocNode] = []
+    injected_files: set[str] = set()
+    for node in base_nodes:
+        ordered_nodes.append(node)
+        file_path = node.href_file
+        if file_path in injected_files:
+            continue
+        chapter_headings = heading_nodes_by_file.get(file_path)
+        if chapter_headings:
+            ordered_nodes.extend(chapter_headings)
+            injected_files.add(file_path)
+
+    for chapter_file in chapter_files:
+        if chapter_file in injected_files:
+            continue
+        ordered_nodes.extend(heading_nodes_by_file.get(chapter_file, []))
+
+    return _dedupe_nodes(ordered_nodes)
 
 
 def extract_outline(epub_path: str | Path, probe_result: ProbeResult | None = None) -> list[TocNode]:
