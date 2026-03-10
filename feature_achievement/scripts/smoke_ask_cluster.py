@@ -26,7 +26,7 @@ def _find_run_id(session: Session) -> int:
     )
 
 
-def _validate_cluster(cluster: dict[str, object]) -> tuple[int, int, int]:
+def _validate_cluster(cluster: dict[str, object]) -> tuple[int, int, int, int, int, int]:
     required_keys = {
         "schema_version",
         "query",
@@ -67,11 +67,15 @@ def _validate_cluster(cluster: dict[str, object]) -> tuple[int, int, int]:
         raise RuntimeError("Cluster malformed: evidence.sections is not a list")
     if not isinstance(evidence_bullets, list):
         raise RuntimeError("Cluster malformed: evidence.bullets is not a list")
+    non_null_source_ref_count = 0
     for bullet in evidence_bullets:
         if not isinstance(bullet, dict):
             raise RuntimeError("Cluster malformed: evidence bullet entry is not an object")
         if "source_refs" not in bullet:
             raise RuntimeError("Cluster malformed: evidence bullet missing source_refs key")
+        source_refs = bullet.get("source_refs")
+        if isinstance(source_refs, list) and len(source_refs) > 0:
+            non_null_source_ref_count += 1
 
     seed_count = len(seed_ids)
     chapter_count = len(chapters)
@@ -83,7 +87,20 @@ def _validate_cluster(cluster: dict[str, object]) -> tuple[int, int, int]:
         raise RuntimeError("Cluster invalid: empty seed list")
     if chapter_count == 0:
         raise RuntimeError("Cluster invalid: empty chapter list")
-    return seed_count, chapter_count, edge_count, evidence_section_count, evidence_bullet_count
+    if evidence_bullet_count == 0:
+        raise RuntimeError("Cluster invalid: evidence.bullets is empty")
+    if non_null_source_ref_count == 0:
+        raise RuntimeError(
+            "Cluster invalid: evidence.bullets contain no non-null source_refs"
+        )
+    return (
+        seed_count,
+        chapter_count,
+        edge_count,
+        evidence_section_count,
+        evidence_bullet_count,
+        non_null_source_ref_count,
+    )
 
 
 def _print_cluster_summary(cluster: dict[str, object]) -> None:
@@ -144,13 +161,21 @@ def main() -> int:
             )
             try:
                 cluster = build_cluster(session=session, req=req)
-                seed_count, chapter_count, edge_count, evidence_section_count, evidence_bullet_count = _validate_cluster(cluster)
+                (
+                    seed_count,
+                    chapter_count,
+                    edge_count,
+                    evidence_section_count,
+                    evidence_bullet_count,
+                    non_null_source_ref_count,
+                ) = _validate_cluster(cluster)
                 print(f"term={term}")
                 print(f"seed_count={seed_count}")
                 print(f"chapter_count={chapter_count}")
                 print(f"edge_count={edge_count}")
                 print(f"evidence_section_count={evidence_section_count}")
                 print(f"evidence_bullet_count={evidence_bullet_count}")
+                print(f"evidence_non_null_source_ref_count={non_null_source_ref_count}")
                 _print_cluster_summary(cluster)
                 _write_cluster_file(cluster)
                 print("smoke passed")

@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`, `09`, `10`
+- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`, `09`, `10`, `11`
 - In progress: none
 
 ---
@@ -209,7 +209,7 @@ Verify:
 
 ---
 
-## [ ] Commit 11 - `test(ask-integration): verify /ask evidence includes source_refs after import`
+## [x] Commit 11 - `test(ask-integration): verify /ask evidence includes source_refs after import`
 
 Purpose:
 - Confirm the parser work is visible in ask-path evidence.
