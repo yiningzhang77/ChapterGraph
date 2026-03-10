@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`, `09`
+- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`, `09`, `10`
 - In progress: none
 
 ---
@@ -192,7 +192,7 @@ Verify:
 
 ---
 
-## [ ] Commit 10 - `chore(import): validate and import EPUB-enriched outputs into DB`
+## [x] Commit 10 - `chore(import): validate and import EPUB-enriched outputs into DB`
 
 Purpose:
 - Move generated data into runtime DB path.

@@ -129,9 +129,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Validate enriched JSON files against v2 schema.")
     parser.add_argument("--config", default="book_content/books.yaml")
     parser.add_argument("--output-dir", default="output")
+    parser.add_argument(
+        "--input",
+        action="append",
+        default=[],
+        help="Explicit enriched JSON path. Can be passed multiple times.",
+    )
     args = parser.parse_args()
 
-    paths = _iter_book_paths(args.config, args.output_dir)
+    paths = args.input if args.input else _iter_book_paths(args.config, args.output_dir)
     if not paths:
         print("no books found in config")
         return 1
