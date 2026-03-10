@@ -14,8 +14,11 @@ from feature_achievement.epub.source_refs import build_source_refs_with_fallback
 _CHAPTER_PREFIX_RE = re.compile(r"^\s*(\d+)\s+")
 _SECTION_PREFIX_RE = re.compile(r"^\s*(\d+\.\d+)\s+")
 _BULLET_PREFIX_RE = re.compile(r"^\s*(\d+\.\d+\.\d+)\s+")
+_SECTION_NUMERIC_RE = re.compile(r"^\s*(\d+)\.(\d+)\b")
+_BULLET_NUMERIC_RE = re.compile(r"^\s*(\d+)\.(\d+)\.(\d+)\b")
 _APPENDIX_WORD_RE = re.compile(r"^\s*appendix\b", re.IGNORECASE)
 _APPENDIX_LETTER_RE = re.compile(r"^\s*[A-Z](?:\b|[.:]\s)")
+_SECTION_ID_RE = re.compile(r"::ch(\d+)::s(\d+)$")
 
 
 class ParseMetrics(TypedDict):
@@ -173,6 +176,71 @@ def _ensure_section(
     return section
 
 
+def _section_id_numbers(section_id: str) -> tuple[int, int] | None:
+    match = _SECTION_ID_RE.search(section_id)
+    if match is None:
+        return None
+    chapter_number = int(match.group(1))
+    section_number = int(match.group(2))
+    return chapter_number, section_number
+
+
+def _bullet_heading_numbers(text_raw: str) -> tuple[int, int, int] | None:
+    match = _BULLET_NUMERIC_RE.match(text_raw)
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+
+def _section_heading_numbers(title_raw: str) -> tuple[int, int] | None:
+    match = _SECTION_NUMERIC_RE.match(title_raw)
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2))
+
+
+def _normalize_section_bullets(section: dict[str, object]) -> None:
+    section_id_obj = section.get("section_id")
+    if not isinstance(section_id_obj, str):
+        return
+    section_numbers = _section_id_numbers(section_id_obj)
+    if section_numbers is None:
+        return
+
+    bullets_obj = section.get("bullets")
+    bullets = bullets_obj if isinstance(bullets_obj, list) else []
+    if not bullets:
+        return
+
+    chapter_number, section_number = section_numbers
+    has_matching_numeric = False
+    filtered_bullets: list[dict[str, object]] = []
+    for bullet in bullets:
+        if not isinstance(bullet, dict):
+            continue
+        text_raw_obj = bullet.get("text_raw")
+        text_raw = text_raw_obj if isinstance(text_raw_obj, str) else ""
+        numeric = _bullet_heading_numbers(text_raw)
+        if numeric is None:
+            continue
+        if numeric[0] != chapter_number or numeric[1] != section_number:
+            continue
+        has_matching_numeric = True
+        filtered_bullets.append(bullet)
+
+    if has_matching_numeric and filtered_bullets:
+        bullets = filtered_bullets
+
+    normalized: list[dict[str, object]] = []
+    for index, bullet in enumerate(bullets, start=1):
+        if not isinstance(bullet, dict):
+            continue
+        bullet["order"] = index
+        bullet["bullet_id"] = f"{section_id_obj}::b{index}"
+        normalized.append(bullet)
+    section["bullets"] = normalized
+
+
 def build_adapter_payload(
     epub_path: str | Path,
     book_id: str,
@@ -193,7 +261,6 @@ def build_adapter_payload(
     chapters: list[dict[str, object]] = []
     unresolved_source_refs: list[dict[str, object]] = []
     chapter_count = 0
-    bullets_with_source_refs = 0
 
     current_chapter: dict[str, object] | None = None
     current_section: dict[str, object] | None = None
@@ -220,9 +287,21 @@ def build_adapter_payload(
                 sections_obj = current_chapter.get("sections")
                 sections = sections_obj if isinstance(sections_obj, list) else []
                 local_order = len(sections) + 1
+                section_order = local_order
+                heading_numbers = _section_heading_numbers(node.title)
+                if heading_numbers is not None and heading_numbers[0] == chapter_count:
+                    used_orders = {
+                        section.get("order")
+                        for section in sections
+                        if isinstance(section, dict)
+                        and isinstance(section.get("order"), int)
+                    }
+                    candidate_order = heading_numbers[1]
+                    if candidate_order >= 1 and candidate_order not in used_orders:
+                        section_order = candidate_order
                 section = {
-                    "section_id": f"{current_chapter['id']}::s{local_order}",
-                    "order": local_order,
+                    "section_id": f"{current_chapter['id']}::s{section_order}",
+                    "order": section_order,
                     "title_raw": node.title,
                     "title_norm": _normalize_for_index(node.title),
                     "bullets": [],
@@ -276,9 +355,7 @@ def build_adapter_payload(
                 section_end_anchor=section_end_anchor,
             ) if node.href_anchor else (None, "unresolved")
 
-            if refs is not None:
-                bullets_with_source_refs += 1
-            else:
+            if refs is None:
                 unresolved_source_refs.append(
                     {
                         "chapter_id": current_chapter["id"],
@@ -311,6 +388,7 @@ def build_adapter_payload(
             section.pop("_meta_href_file", None)
             section.pop("_meta_start_anchor", None)
             section.pop("_meta_node_index", None)
+            _normalize_section_bullets(section)
             cleaned_sections.append(section)
         chapter["sections"] = cleaned_sections
         chapter_index_text = _build_chapter_index_text(book_id, chapter)
@@ -319,6 +397,7 @@ def build_adapter_payload(
 
     computed_section_count = 0
     computed_bullet_count = 0
+    computed_bullets_with_source_refs = 0
     for chapter in chapters:
         sections_obj = chapter.get("sections")
         sections = sections_obj if isinstance(sections_obj, list) else []
@@ -329,13 +408,20 @@ def build_adapter_payload(
             bullets_obj = section.get("bullets")
             bullets = bullets_obj if isinstance(bullets_obj, list) else []
             computed_bullet_count += len(bullets)
+            for bullet in bullets:
+                if not isinstance(bullet, dict):
+                    continue
+                refs_obj = bullet.get("source_refs")
+                refs = refs_obj if isinstance(refs_obj, list) else []
+                if refs:
+                    computed_bullets_with_source_refs += 1
 
     metrics: ParseMetrics = {
         "total_outline_nodes": len(entries),
         "chapter_count": len(chapters),
         "section_count": computed_section_count,
         "bullet_count": computed_bullet_count,
-        "bullets_with_source_refs": bullets_with_source_refs,
+        "bullets_with_source_refs": computed_bullets_with_source_refs,
         "unresolved_source_refs": len(unresolved_source_refs),
     }
 
