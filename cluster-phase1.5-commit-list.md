@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`
+- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`, `09`
 - In progress: none
 
 ---
@@ -172,7 +172,7 @@ Verify:
 
 ---
 
-## [ ] Commit 09 - `feat(smoke): add smoke_epub_source_refs with coverage gates`
+## [x] Commit 09 - `feat(smoke): add smoke_epub_source_refs with coverage gates`
 
 Purpose:
 - Provide fast operational quality check.
