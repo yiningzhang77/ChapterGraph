@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`, `04`, `05`, `06`
+- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`
 - In progress: none
 
 ---
@@ -133,7 +133,7 @@ Verify:
 
 ---
 
-## [ ] Commit 07 - `feat(manual-backfill): export unresolved list and patch apply script`
+## [x] Commit 07 - `feat(manual-backfill): export unresolved list and patch apply script`
 
 Purpose:
 - Make "skip hard parse + manual fill" operational.

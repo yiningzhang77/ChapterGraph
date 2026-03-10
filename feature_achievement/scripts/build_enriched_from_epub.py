@@ -23,6 +23,14 @@ def parse_args() -> argparse.Namespace:
         "--output",
         help="Output JSON path. Default: output/{book_id}_enriched_from_epub.json",
     )
+    parser.add_argument(
+        "--unresolved-output",
+        default="tmp/source_refs_needs_manual.json",
+        help=(
+            "Path to write unresolved source ref items for manual backfill. "
+            "Default: tmp/source_refs_needs_manual.json"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -58,7 +66,15 @@ def main() -> int:
         encoding="utf-8",
     )
 
+    unresolved_output_path = Path(args.unresolved_output)
+    unresolved_output_path.parent.mkdir(parents=True, exist_ok=True)
+    unresolved_output_path.write_text(
+        json.dumps(unresolved, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
     print(f"output_path={output_path}")
+    print(f"unresolved_output_path={unresolved_output_path}")
     print(f"parse_status={parse_status}")
     print(f"chapter_count={metrics['chapter_count']}")
     print(f"section_count={metrics['section_count']}")
