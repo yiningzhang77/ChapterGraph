@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`
+- Completed: `01`, `02`, `03`
 - In progress: none
 
 ---
@@ -57,7 +57,7 @@ Verify:
 
 ---
 
-## [ ] Commit 03 - `feat(epub-content): add anchor slicing and noise cleaning core`
+## [x] Commit 03 - `feat(epub-content): add anchor slicing and noise cleaning core`
 
 Purpose:
 - Implement shared text slicing logic from anchor range.
