@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`, `09`, `10`, `11`
+- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`, `09`, `10`, `11`, `12`
 - In progress: none
 
 ---
@@ -225,7 +225,7 @@ Verify:
 
 ---
 
-## [ ] Commit 12 - `docs(phase1.5): update phase status, runbook, and unresolved-backfill workflow`
+## [x] Commit 12 - `docs(phase1.5): update phase status, runbook, and unresolved-backfill workflow`
 
 Purpose:
 - Close the loop with operational docs.
