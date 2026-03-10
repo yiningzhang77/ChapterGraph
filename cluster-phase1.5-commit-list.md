@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`, `04`, `05`
+- Completed: `01`, `02`, `03`, `04`, `05`, `06`
 - In progress: none
 
 ---
@@ -113,7 +113,7 @@ Verify:
 
 ---
 
-## [ ] Commit 06 - `feat(script): add build_enriched_from_epub pipeline script`
+## [x] Commit 06 - `feat(script): add build_enriched_from_epub pipeline script`
 
 Purpose:
 - Produce import-ready enriched JSON from EPUB.
