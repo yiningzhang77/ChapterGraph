@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`
+- Completed: `01`, `02`
 - In progress: none
 
 ---
@@ -39,7 +39,7 @@ Verify:
 
 ---
 
-## [ ] Commit 02 - `feat(epub-outline): implement TOC extraction with per-type priority`
+## [x] Commit 02 - `feat(epub-outline): implement TOC extraction with per-type priority`
 
 Purpose:
 - Build unified outline extraction without mixing type-specific heuristics.
