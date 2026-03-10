@@ -13,7 +13,7 @@ Goal: Implement `cluster-phase1.5-plan.md` with a probe-first EPUB adapter that 
 ## Progress Snapshot
 
 - Planned commits: `01` to `12`
-- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`
+- Completed: `01`, `02`, `03`, `04`, `05`, `06`, `07`, `08`
 - In progress: none
 
 ---
@@ -154,7 +154,7 @@ Verify:
 
 ---
 
-## [ ] Commit 08 - `test(epub): add probe/outline/slice/source_refs unit coverage`
+## [x] Commit 08 - `test(epub): add probe/outline/slice/source_refs unit coverage`
 
 Purpose:
 - Lock in deterministic behavior and prevent parser drift.
