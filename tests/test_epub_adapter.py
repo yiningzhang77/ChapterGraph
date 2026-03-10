@@ -50,3 +50,37 @@ def test_adapter_outputs_unresolved_list_structure() -> None:
         assert "section_id" in sample
         assert "bullet_id" in sample
         assert "reason" in sample
+
+
+def test_adapter_default_keeps_main_numbered_chapters_only() -> None:
+    spring_in_action_path = _first_epub("spring_in_action")
+    springboot_path = _first_epub("springboot_in_action")
+
+    payload_a = build_adapter_payload(
+        epub_path=spring_in_action_path,
+        book_id="spring-in-action",
+    )
+    payload_b = build_adapter_payload(
+        epub_path=springboot_path,
+        book_id="springboot-in-action",
+    )
+
+    assert len(payload_a["chapters"]) == 18
+    assert len(payload_b["chapters"]) == 8
+
+
+def test_adapter_can_include_appendix_when_enabled() -> None:
+    springboot_path = _first_epub("springboot_in_action")
+
+    payload_default = build_adapter_payload(
+        epub_path=springboot_path,
+        book_id="springboot-in-action",
+    )
+    payload_with_appendix = build_adapter_payload(
+        epub_path=springboot_path,
+        book_id="springboot-in-action",
+        include_appendix=True,
+    )
+
+    assert len(payload_default["chapters"]) == 8
+    assert len(payload_with_appendix["chapters"]) == 12

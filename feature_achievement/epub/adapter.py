@@ -14,6 +14,8 @@ from feature_achievement.epub.source_refs import build_source_refs_with_fallback
 _CHAPTER_PREFIX_RE = re.compile(r"^\s*(\d+)\s+")
 _SECTION_PREFIX_RE = re.compile(r"^\s*(\d+\.\d+)\s+")
 _BULLET_PREFIX_RE = re.compile(r"^\s*(\d+\.\d+\.\d+)\s+")
+_APPENDIX_WORD_RE = re.compile(r"^\s*appendix\b", re.IGNORECASE)
+_APPENDIX_LETTER_RE = re.compile(r"^\s*[A-Z](?:\b|[.:]\s)")
 
 
 class ParseMetrics(TypedDict):
@@ -103,20 +105,28 @@ def _build_chapter_index_text(book_id: str, chapter: dict[str, object]) -> str:
     return " ".join(parts)
 
 
-def _classify_node(node: TocNode) -> str:
+def _is_chapter_title(title: str, include_appendix: bool) -> bool:
+    if _CHAPTER_PREFIX_RE.match(title):
+        return True
+    if include_appendix and (
+        _APPENDIX_WORD_RE.match(title) or _APPENDIX_LETTER_RE.match(title)
+    ):
+        return True
+    return False
+
+
+def _classify_node(node: TocNode, include_appendix: bool) -> str:
     title = node.title.strip()
     if _BULLET_PREFIX_RE.match(title):
         return "bullet"
     if _SECTION_PREFIX_RE.match(title):
         return "section"
-    if _CHAPTER_PREFIX_RE.match(title):
+    if _is_chapter_title(title, include_appendix=include_appendix):
         return "chapter"
     if node.level >= 3:
         return "bullet"
     if node.level == 2:
         return "section"
-    if node.level == 1:
-        return "chapter"
     return "ignore"
 
 
@@ -163,11 +173,20 @@ def _ensure_section(
     return section
 
 
-def build_adapter_payload(epub_path: str | Path, book_id: str) -> AdaptedPayload:
+def build_adapter_payload(
+    epub_path: str | Path,
+    book_id: str,
+    *,
+    include_appendix: bool = False,
+) -> AdaptedPayload:
     probe_result: ProbeResult = probe_epub(epub_path)
     outline_nodes = extract_outline(epub_path, probe_result)
     entries = [
-        _OutlineEntry(index=index, node=node, kind=_classify_node(node))
+        _OutlineEntry(
+            index=index,
+            node=node,
+            kind=_classify_node(node, include_appendix=include_appendix),
+        )
         for index, node in enumerate(outline_nodes)
     ]
 

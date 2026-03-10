@@ -31,12 +31,21 @@ def parse_args() -> argparse.Namespace:
             "Default: tmp/source_refs_needs_manual.json"
         ),
     )
+    parser.add_argument(
+        "--include-appendix",
+        action="store_true",
+        help="Include appendix-like chapter entries (A/B/... or Appendix ...).",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    payload = build_adapter_payload(epub_path=args.epub, book_id=args.book_id)
+    payload = build_adapter_payload(
+        epub_path=args.epub,
+        book_id=args.book_id,
+        include_appendix=args.include_appendix,
+    )
     chapters = payload["chapters"]
     metrics = payload["metrics"]
     unresolved = payload["unresolved_source_refs"]
