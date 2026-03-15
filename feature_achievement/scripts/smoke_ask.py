@@ -97,8 +97,9 @@ def main() -> int:
                 candidate = _post_ask(
                     client,
                     {
-                        "query": term,
                         "query_type": "term",
+                        "term": term,
+                        "user_query": f"Tell me about {term}.",
                         "run_id": run_id,
                         "enrichment_version": TARGET_VERSION,
                         "max_hops": 2,
@@ -133,9 +134,9 @@ def main() -> int:
         chapter_response = _post_ask(
             client,
             {
-                "query": "Explain the selected chapter.",
                 "query_type": "chapter",
                 "chapter_id": first_seed,
+                "query": "",
                 "run_id": run_id,
                 "enrichment_version": TARGET_VERSION,
                 "max_hops": 2,

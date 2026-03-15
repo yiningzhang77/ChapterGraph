@@ -339,7 +339,7 @@ UX rules:
 
 ### `test(smoke): validate explicit-anchor flow and regression safety`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

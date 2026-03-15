@@ -153,8 +153,9 @@ def main() -> int:
         last_error: str | None = None
         for term in KNOWN_TERMS:
             req = AskRequest(
-                query=term,
                 query_type="term",
+                term=term,
+                user_query=f"Tell me about {term}.",
                 run_id=run_id,
                 enrichment_version=TARGET_VERSION,
                 max_hops=2,
