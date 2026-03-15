@@ -4,7 +4,9 @@ from pydantic import BaseModel, Field, model_validator
 
 
 class AskRequest(BaseModel):
-    query: str = Field(..., min_length=1)
+    query: str | None = None
+    term: str | None = None
+    user_query: str | None = None
     query_type: Literal["term", "chapter"] = "term"
     run_id: int
     enrichment_version: str = "v2_indexed_sections_bullets"
@@ -23,9 +25,39 @@ class AskRequest(BaseModel):
 
     @model_validator(mode="after")
     def normalize(self):
-        self.query = self.query.strip()
-        if self.query_type == "chapter" and not self.chapter_id:
-            self.chapter_id = self.query
+        if self.query is not None:
+            self.query = self.query.strip()
+            if not self.query:
+                self.query = None
+        if self.term is not None:
+            self.term = self.term.strip()
+            if not self.term:
+                self.term = None
+        if self.user_query is not None:
+            self.user_query = self.user_query.strip()
+            if not self.user_query:
+                self.user_query = None
+        if self.chapter_id is not None:
+            self.chapter_id = self.chapter_id.strip()
+            if not self.chapter_id:
+                self.chapter_id = None
+
+        if self.query_type == "term":
+            if not self.term:
+                raise ValueError("term is required for term query_type")
+            if not self.user_query:
+                self.user_query = (
+                    f'Explain the term "{self.term}" using the retrieved cluster.'
+                )
+            self.query = self.user_query
+        else:
+            if not self.chapter_id:
+                raise ValueError("chapter_id is required for chapter query_type")
+            if not self.query:
+                self.query = (
+                    f'Summarize the selected chapter "{self.chapter_id}" '
+                    "using the retrieved cluster."
+                )
         return self
 
 
