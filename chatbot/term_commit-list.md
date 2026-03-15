@@ -158,7 +158,7 @@ Add/update cases for:
 
 ### `feat(llm): expose retrieval term in prompt building`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

@@ -39,10 +39,12 @@ def test_build_prompt_includes_query_type_and_cluster_json() -> None:
         query="What is actuator?",
         query_type="term",
         cluster=_cluster(["spring::ch1"]),
+        retrieval_term="Actuator",
     )
 
     assert "User question: What is actuator?" in prompt
     assert "Query type: term" in prompt
+    assert "Retrieval term: Actuator" in prompt
     assert '"seed_chapter_ids": ["spring::ch1"]' in prompt
     assert "Cluster JSON:" in prompt
 
@@ -56,6 +58,7 @@ def test_build_prompt_chapter_includes_chapter_specific_tasks() -> None:
 
     assert "Summarize the selected chapter in a structured way." in prompt
     assert "Use neighbor chapters only as secondary context." in prompt
+    assert "Retrieval term:" not in prompt
 
 
 def test_ask_qwen_stub_returns_seed_citations(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -66,6 +69,7 @@ def test_ask_qwen_stub_returns_seed_citations(monkeypatch: pytest.MonkeyPatch) -
         query="Actuator",
         query_type="term",
         cluster=_cluster(["spring::ch1", "spring::ch2"]),
+        retrieval_term="Actuator",
         model="qwen",
         timeout_ms=5000,
     )
@@ -83,6 +87,7 @@ def test_ask_qwen_raises_for_unsupported_provider(monkeypatch: pytest.MonkeyPatc
             query="Actuator",
             query_type="term",
             cluster=_cluster(["spring::ch1"]),
+            retrieval_term="Actuator",
             model="qwen",
             timeout_ms=5000,
         )
@@ -145,6 +150,7 @@ def test_ask_qwen_openai_compatible_returns_message_content(
         query="Actuator",
         query_type="term",
         cluster=_cluster(["spring::ch1"]),
+        retrieval_term="Actuator",
         model="qwen",
         timeout_ms=4500,
     )
@@ -157,6 +163,9 @@ def test_ask_qwen_openai_compatible_returns_message_content(
     assert body["model"] == "qwen-max"
     assert body["temperature"] == 0.0
     assert body["max_tokens"] == 256
+    messages = body["messages"]
+    assert messages[1]["content"].startswith("User question: Actuator")
+    assert "Retrieval term: Actuator" in messages[1]["content"]
     assert captured["timeout"] == 4.5
 
 
@@ -192,6 +201,7 @@ def test_ask_qwen_openai_compatible_supports_text_array_content(
         query="Actuator",
         query_type="term",
         cluster=_cluster(["spring::ch1"]),
+        retrieval_term="Actuator",
         model="qwen",
         timeout_ms=5000,
     )
@@ -212,6 +222,7 @@ def test_ask_qwen_openai_compatible_requires_base_url(
             query="Actuator",
             query_type="term",
             cluster=_cluster(["spring::ch1"]),
+            retrieval_term="Actuator",
             model="qwen",
             timeout_ms=5000,
         )
@@ -245,6 +256,7 @@ def test_ask_qwen_openai_compatible_surfaces_http_error(
             query="Actuator",
             query_type="term",
             cluster=_cluster(["spring::ch1"]),
+            retrieval_term="Actuator",
             model="qwen",
             timeout_ms=5000,
         )

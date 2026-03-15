@@ -117,6 +117,7 @@ def _ask_openai_compatible(
     query: str,
     query_type: str,
     cluster: dict[str, object],
+    retrieval_term: str | None,
     model: str,
     timeout_ms: int,
 ) -> str:
@@ -126,7 +127,15 @@ def _ask_openai_compatible(
         "model": _provider_model(model),
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": build_prompt(query, query_type, cluster)},
+            {
+                "role": "user",
+                "content": build_prompt(
+                    query,
+                    query_type,
+                    cluster,
+                    retrieval_term=retrieval_term,
+                ),
+            },
         ],
         "temperature": _provider_temperature(),
     }
@@ -172,12 +181,18 @@ def ask_qwen(
     query: str,
     query_type: str,
     cluster: dict[str, object],
+    retrieval_term: str | None,
     model: str,
     timeout_ms: int,
 ) -> str:
     _load_local_env_config()
     provider = os.getenv("QWEN_PROVIDER", "stub").strip().lower()
-    _ = (SYSTEM_PROMPT, build_prompt(query, query_type, cluster), model, timeout_ms)
+    _ = (
+        SYSTEM_PROMPT,
+        build_prompt(query, query_type, cluster, retrieval_term=retrieval_term),
+        model,
+        timeout_ms,
+    )
 
     if provider == "stub":
         citations = _extract_seed_citations(cluster)
@@ -199,6 +214,7 @@ def ask_qwen(
             query=query,
             query_type=query_type,
             cluster=cluster,
+            retrieval_term=retrieval_term,
             model=model,
             timeout_ms=timeout_ms,
         )
