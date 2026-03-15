@@ -45,10 +45,9 @@ def _int_order(value: object) -> int:
 
 def _pick_seed_ids(session: Session, req: AskRequest) -> tuple[list[str], str]:
     if req.query_type == "chapter":
-        chapter_ref = req.chapter_id or req.query
         chapter_id = resolve_chapter_seed_id(
             session=session,
-            chapter_ref=chapter_ref,
+            chapter_ref=req.chapter_id or "",
             enrichment_version=req.enrichment_version,
         )
         if chapter_id is None:
@@ -57,7 +56,7 @@ def _pick_seed_ids(session: Session, req: AskRequest) -> tuple[list[str], str]:
 
     term_ids = search_term_seed_ids_ilike(
         session=session,
-        term=req.query,
+        term=req.term or "",
         enrichment_version=req.enrichment_version,
         limit=req.seed_top_k,
     )
@@ -79,7 +78,8 @@ def _build_evidence(
     req: AskRequest,
     primary_chapter_id: str | None = None,
 ) -> dict[str, object]:
-    query_tokens = set(_normalize_text(req.query).split())
+    query_basis = req.term if req.query_type == "term" else req.query
+    query_tokens = set(_normalize_text(query_basis or "").split())
     section_rows: list[dict[str, object]] = []
     bullet_rows: list[dict[str, object]] = []
 

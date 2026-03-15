@@ -33,8 +33,8 @@ class EnrichedStub:
 
 def _req(**overrides: object) -> AskRequest:
     payload: dict[str, object] = {
-        "query": "Actuator",
         "query_type": "term",
+        "term": "Actuator",
         "run_id": 1,
         "enrichment_version": "v2_indexed_sections_bullets",
         "max_hops": 2,
@@ -189,6 +189,43 @@ def test_successful_cluster_build(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(bullets, list)
     assert len(sections) > 0
     assert len(bullets) > 0
+
+
+def test_pick_seed_ids_uses_term_anchor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_search_term_seed_ids_ilike(
+        session: Session,
+        term: str,
+        enrichment_version: str,
+        limit: int,
+    ) -> list[str]:
+        captured["term"] = term
+        captured["enrichment_version"] = enrichment_version
+        captured["limit"] = limit
+        return ["book::ch7"]
+
+    monkeypatch.setattr(
+        cluster_builder,
+        "search_term_seed_ids_ilike",
+        fake_search_term_seed_ids_ilike,
+    )
+
+    seed_ids, reason = cluster_builder._pick_seed_ids(
+        Session(),
+        _req(
+            term="Actuator",
+            user_query="Tell me about Actuator and compare it with JMX",
+        ),
+    )
+
+    assert seed_ids == ["book::ch7"]
+    assert reason == "term_ilike"
+    assert captured["term"] == "Actuator"
+    assert captured["enrichment_version"] == "v2_indexed_sections_bullets"
+    assert captured["limit"] == 5
 
 
 def test_chapter_mode_evidence_prioritizes_selected_chapter_order(
@@ -395,7 +432,101 @@ def test_term_mode_evidence_still_prefers_overlap_score(
 
     cluster = cluster_builder.build_cluster(
         Session(),
-        _req(query="Actuator", query_type="term", section_top_k=2, bullet_top_k=2),
+        _req(
+            term="Actuator",
+            user_query="Tell me about Actuator",
+            query_type="term",
+            section_top_k=2,
+            bullet_top_k=2,
+        ),
+    )
+
+    evidence = cluster["evidence"]
+    assert evidence["sections"][0]["section_id"] == "book::ch2::s1"
+    assert evidence["bullets"][0]["bullet_id"] == "book::ch2::s1::b1"
+
+
+def test_term_mode_evidence_scoring_uses_term_not_user_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_run",
+        lambda session, run_id: RunStub(enrichment_version="v2_indexed_sections_bullets"),
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "_pick_seed_ids",
+        lambda session, req: (["book::ch1", "book::ch2"], "term_ilike"),
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_edges_from_sources",
+        lambda session, run_id, source_ids, min_edge_score, limit: [],
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_enriched_by_ids",
+        lambda session, chapter_ids, enrichment_version: [
+            EnrichedStub(
+                id="book::ch1",
+                book_id="book",
+                title="Admin",
+                chapter_text="admin",
+                chapter_index_text="index admin",
+                sections=[
+                    {
+                        "section_id": "book::ch1::s1",
+                        "order": 1,
+                        "title_raw": "1.1 JMX",
+                        "title_norm": "jmx",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch1::s1::b1",
+                                "order": 1,
+                                "text_raw": "1.1.1 JMX detail",
+                                "text_norm": "jmx detail",
+                                "source_refs": None,
+                            }
+                        ],
+                    }
+                ],
+            ),
+            EnrichedStub(
+                id="book::ch2",
+                book_id="book",
+                title="Actuator",
+                chapter_text="actuator",
+                chapter_index_text="index actuator",
+                sections=[
+                    {
+                        "section_id": "book::ch2::s1",
+                        "order": 1,
+                        "title_raw": "2.1 Actuator",
+                        "title_norm": "actuator",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch2::s1::b1",
+                                "order": 1,
+                                "text_raw": "2.1.1 Actuator endpoint",
+                                "text_norm": "actuator endpoint",
+                                "source_refs": None,
+                            }
+                        ],
+                    }
+                ],
+            ),
+        ],
+    )
+
+    cluster = cluster_builder.build_cluster(
+        Session(),
+        _req(
+            term="Actuator",
+            user_query="Compare Actuator with JMX",
+            section_top_k=2,
+            bullet_top_k=2,
+        ),
     )
 
     evidence = cluster["evidence"]
