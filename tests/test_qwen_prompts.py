@@ -29,6 +29,9 @@ def _cluster(seed_ids: list[str]) -> dict[str, object]:
 def test_system_prompt_mentions_cluster_grounding() -> None:
     assert "Only use facts from the provided cluster JSON." in SYSTEM_PROMPT
     assert "cite chapter_id" in SYSTEM_PROMPT
+    assert "Follow the user's language." in SYSTEM_PROMPT
+    assert "If the user asks in Chinese, answer in Chinese." in SYSTEM_PROMPT
+    assert "Never create mixed-script partial translations" in SYSTEM_PROMPT
 
 
 def test_build_prompt_includes_query_type_and_cluster_json() -> None:
@@ -42,6 +45,17 @@ def test_build_prompt_includes_query_type_and_cluster_json() -> None:
     assert "Query type: term" in prompt
     assert '"seed_chapter_ids": ["spring::ch1"]' in prompt
     assert "Cluster JSON:" in prompt
+
+
+def test_build_prompt_chapter_includes_chapter_specific_tasks() -> None:
+    prompt = build_prompt(
+        query="Summarize this chapter",
+        query_type="chapter",
+        cluster=_cluster(["spring::ch8"]),
+    )
+
+    assert "Summarize the selected chapter in a structured way." in prompt
+    assert "Use neighbor chapters only as secondary context." in prompt
 
 
 def test_ask_qwen_stub_returns_seed_citations(monkeypatch: pytest.MonkeyPatch) -> None:

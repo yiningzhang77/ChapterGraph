@@ -203,7 +203,7 @@ Acceptance:
 
 ## 3.3 Commit C: tests
 
-Status: pending
+Status: completed
 
 Add focused tests for:
 

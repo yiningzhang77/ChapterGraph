@@ -189,3 +189,215 @@ def test_successful_cluster_build(monkeypatch: pytest.MonkeyPatch) -> None:
     assert isinstance(bullets, list)
     assert len(sections) > 0
     assert len(bullets) > 0
+
+
+def test_chapter_mode_evidence_prioritizes_selected_chapter_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_run",
+        lambda session, run_id: RunStub(enrichment_version="v2_indexed_sections_bullets"),
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "_pick_seed_ids",
+        lambda session, req: (["book::ch2"], "chapter_selected"),
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_edges_from_sources",
+        lambda session, run_id, source_ids, min_edge_score, limit: [
+            EdgeStub(
+                from_chapter="book::ch2",
+                to_chapter="book::ch9",
+                score=0.8,
+                type="embedding",
+            )
+        ],
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_enriched_by_ids",
+        lambda session, chapter_ids, enrichment_version: [
+            EnrichedStub(
+                id="book::ch2",
+                book_id="book",
+                title="Selected chapter",
+                chapter_text="selected",
+                chapter_index_text="index selected",
+                sections=[
+                    {
+                        "section_id": "book::ch2::s1",
+                        "order": 1,
+                        "title_raw": "2.1 First",
+                        "title_norm": "first",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch2::s1::b1",
+                                "order": 1,
+                                "text_raw": "2.1.1 Alpha",
+                                "text_norm": "alpha",
+                                "source_refs": None,
+                            }
+                        ],
+                    },
+                    {
+                        "section_id": "book::ch2::s2",
+                        "order": 2,
+                        "title_raw": "2.2 Second",
+                        "title_norm": "second",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch2::s2::b1",
+                                "order": 1,
+                                "text_raw": "2.2.1 Beta",
+                                "text_norm": "beta",
+                                "source_refs": None,
+                            }
+                        ],
+                    },
+                ],
+            ),
+            EnrichedStub(
+                id="book::ch9",
+                book_id="book",
+                title="Neighbor chapter",
+                chapter_text="neighbor",
+                chapter_index_text="index neighbor",
+                sections=[
+                    {
+                        "section_id": "book::ch9::s1",
+                        "order": 1,
+                        "title_raw": "9.1 Neighbor",
+                        "title_norm": "neighbor",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch9::s1::b1",
+                                "order": 1,
+                                "text_raw": "9.1.1 Gamma",
+                                "text_norm": "gamma",
+                                "source_refs": None,
+                            }
+                        ],
+                    }
+                ],
+            ),
+        ],
+    )
+
+    cluster = cluster_builder.build_cluster(
+        Session(),
+        _req(
+            query="Summarize this chapter",
+            query_type="chapter",
+            chapter_id="book::ch2",
+            section_top_k=2,
+            bullet_top_k=2,
+        ),
+    )
+
+    evidence = cluster["evidence"]
+    assert evidence["sections"] == [
+        {
+            "chapter_id": "book::ch2",
+            "section_id": "book::ch2::s1",
+            "title_norm": "first",
+            "title_raw": "2.1 First",
+            "score": 0.0,
+        },
+        {
+            "chapter_id": "book::ch2",
+            "section_id": "book::ch2::s2",
+            "title_norm": "second",
+            "title_raw": "2.2 Second",
+            "score": 0.0,
+        },
+    ]
+    assert [row["bullet_id"] for row in evidence["bullets"]] == [
+        "book::ch2::s1::b1",
+        "book::ch2::s2::b1",
+    ]
+
+
+def test_term_mode_evidence_still_prefers_overlap_score(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_run",
+        lambda session, run_id: RunStub(enrichment_version="v2_indexed_sections_bullets"),
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "_pick_seed_ids",
+        lambda session, req: (["book::ch1", "book::ch2"], "term_ilike"),
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_edges_from_sources",
+        lambda session, run_id, source_ids, min_edge_score, limit: [],
+    )
+    monkeypatch.setattr(
+        cluster_builder,
+        "get_enriched_by_ids",
+        lambda session, chapter_ids, enrichment_version: [
+            EnrichedStub(
+                id="book::ch1",
+                book_id="book",
+                title="A",
+                chapter_text="a",
+                chapter_index_text="index a",
+                sections=[
+                    {
+                        "section_id": "book::ch1::s1",
+                        "order": 1,
+                        "title_raw": "1.1 Other",
+                        "title_norm": "other",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch1::s1::b1",
+                                "order": 1,
+                                "text_raw": "1.1.1 Other detail",
+                                "text_norm": "other detail",
+                                "source_refs": None,
+                            }
+                        ],
+                    }
+                ],
+            ),
+            EnrichedStub(
+                id="book::ch2",
+                book_id="book",
+                title="B",
+                chapter_text="b",
+                chapter_index_text="index b",
+                sections=[
+                    {
+                        "section_id": "book::ch2::s1",
+                        "order": 1,
+                        "title_raw": "2.1 Actuator",
+                        "title_norm": "actuator",
+                        "bullets": [
+                            {
+                                "bullet_id": "book::ch2::s1::b1",
+                                "order": 1,
+                                "text_raw": "2.1.1 Actuator endpoint",
+                                "text_norm": "actuator endpoint",
+                                "source_refs": None,
+                            }
+                        ],
+                    }
+                ],
+            ),
+        ],
+    )
+
+    cluster = cluster_builder.build_cluster(
+        Session(),
+        _req(query="Actuator", query_type="term", section_top_k=2, bullet_top_k=2),
+    )
+
+    evidence = cluster["evidence"]
+    assert evidence["sections"][0]["section_id"] == "book::ch2::s1"
+    assert evidence["bullets"][0]["bullet_id"] == "book::ch2::s1::b1"
