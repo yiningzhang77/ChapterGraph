@@ -6,3 +6,6 @@ output
 frontend/graph-core-dist
 frontend/node_modules
 config/llm.env
+/tmp
+book_epub/
+chatbot/
