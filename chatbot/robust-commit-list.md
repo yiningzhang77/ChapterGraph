@@ -217,7 +217,7 @@ Suggested text:
 
 ### `feat(frontend): render broad overview warning above allowed broad answers`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

@@ -504,12 +504,19 @@ function App() {
                                             : `term ${message.term ?? ""}`.trim(),
                                 ),
                                 message.role === "assistant"
-                                    && message.responseState === "needs_narrower_term"
                                     && message.warningMessage
-                                    ? h("div", { className: "askWarning askWarningBlocked" }, message.warningMessage)
+                                    ? h(
+                                        "div",
+                                        {
+                                            className: message.responseState === "broad_overview"
+                                                ? "askWarning askWarningOverview"
+                                                : "askWarning askWarningBlocked",
+                                        },
+                                        message.warningMessage,
+                                    )
                                     : null,
                                 message.role === "assistant"
-                                    && message.responseState === "needs_narrower_term"
+                                    && message.warningMessage
                                     && Array.isArray(message.suggestedTerms)
                                     && message.suggestedTerms.length > 0
                                     ? h(
