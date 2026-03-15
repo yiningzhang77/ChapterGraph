@@ -31,6 +31,7 @@ function App() {
     const [selectedRun, setSelectedRun] = useState("");
     const [askMode, setAskMode] = useState("term");
     const [askQuery, setAskQuery] = useState("");
+    const [askTerm, setAskTerm] = useState("");
     const [messages, setMessages] = useState([]);
     const [askError, setAskError] = useState("");
     const [askLoading, setAskLoading] = useState(false);
@@ -242,7 +243,7 @@ function App() {
         return detail;
     };
 
-    const askByTerm = async (query) => {
+    const askByTerm = async (term, userQuery) => {
         const response = await fetch(`${API}/ask`, {
             method: "POST",
             headers: {
@@ -251,7 +252,8 @@ function App() {
             body: JSON.stringify({
                 run_id: Number(selectedRun),
                 query_type: "term",
-                query,
+                term,
+                user_query: userQuery,
                 llm_enabled: true,
                 return_cluster: false,
                 return_graph_fragment: false,
@@ -287,12 +289,13 @@ function App() {
 
     const onAskSubmit = async () => {
         const query = askQuery.trim();
+        const term = askTerm.trim();
         if (!selectedRun) {
             setAskError("Please select a run first.");
             return;
         }
-        if (!query) {
-            setAskError("Please enter a question.");
+        if (askMode === "term" && !term) {
+            setAskError("Please enter a term.");
             return;
         }
         if (askMode === "chapter" && !selectedChapter?.chapterId) {
@@ -302,8 +305,11 @@ function App() {
 
         const userMessage = {
             role: "user",
-            text: query,
+            text: askMode === "term"
+                ? (query ? `${term}\n${query}` : term)
+                : (query || `chapter ${selectedChapter.chapterId}`),
             queryType: askMode,
+            term: askMode === "term" ? term : null,
             chapterId: askMode === "chapter" ? selectedChapter.chapterId : null,
         };
         setMessages((prev) => [...prev, userMessage]);
@@ -313,7 +319,7 @@ function App() {
         try {
             const result = askMode === "chapter"
                 ? await askByChapter(query, selectedChapter.chapterId)
-                : await askByTerm(query);
+                : await askByTerm(term, query);
             const answer = typeof result.answer_markdown === "string" && result.answer_markdown.trim()
                 ? result.answer_markdown
                 : "No answer returned from /ask.";
@@ -410,11 +416,29 @@ function App() {
                             : "Hint: click a chapter node on the graph first.",
                     )
                     : null,
+                askMode === "term"
+                    ? h(React.Fragment, null,
+                        h("div", { className: "askFieldLabel" }, "Term"),
+                        h("input", {
+                            className: "askFieldInput",
+                            type: "text",
+                            placeholder: "Actuator / JdbcTemplate / data persistence",
+                            value: askTerm,
+                            onChange: (e) => setAskTerm(e.target.value),
+                            disabled: askLoading,
+                        }),
+                    )
+                    : null,
+                h(
+                    "div",
+                    { className: "askFieldLabel" },
+                    askMode === "chapter" ? "Question (Optional)" : "Ask About This Term (Optional)",
+                ),
                 h("textarea", {
                     className: "askInput",
                     placeholder: askMode === "chapter"
                         ? "Ask about the selected chapter..."
-                        : "Ask about a term...",
+                        : "Ask a specific question about this term...",
                     value: askQuery,
                     onChange: (e) => setAskQuery(e.target.value),
                     disabled: askLoading,
@@ -449,7 +473,7 @@ function App() {
                                         ? "assistant"
                                         : message.queryType === "chapter"
                                             ? `chapter ${message.chapterId ?? ""}`.trim()
-                                            : "term",
+                                            : `term ${message.term ?? ""}`.trim(),
                                 ),
                                 h("div", { className: "askText" }, message.text),
                             ),

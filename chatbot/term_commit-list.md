@@ -271,7 +271,7 @@ Add/update cases for:
 
 ### `feat(frontend): split term ask and require explicit chapter selection`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
