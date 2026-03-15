@@ -23,9 +23,10 @@ def ask(
     if req.llm_enabled:
         try:
             answer_markdown = ask_qwen(
-                query=req.query,
+                query=req.user_query if req.query_type == "term" else req.query or "",
                 query_type=req.query_type,
                 cluster=cluster_payload,
+                retrieval_term=req.term if req.query_type == "term" else None,
                 model=req.llm_model,
                 timeout_ms=req.llm_timeout_ms,
             )

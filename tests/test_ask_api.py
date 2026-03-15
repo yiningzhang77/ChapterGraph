@@ -26,8 +26,8 @@ def client() -> Iterator[TestClient]:
 
 def _payload(**overrides: object) -> dict[str, object]:
     body: dict[str, object] = {
-        "query": "Actuator",
         "query_type": "term",
+        "term": "Actuator",
         "run_id": 7,
         "llm_enabled": False,
     }
@@ -128,12 +128,14 @@ def test_ask_api_term_flow_success_with_llm(
         query: str,
         query_type: str,
         cluster: dict[str, object],
+        retrieval_term: str | None,
         model: str,
         timeout_ms: int,
     ) -> str:
         captured["query"] = query
         captured["query_type"] = query_type
         captured["cluster"] = cluster
+        captured["retrieval_term"] = retrieval_term
         captured["model"] = model
         captured["timeout_ms"] = timeout_ms
         return "answer ok"
@@ -156,8 +158,9 @@ def test_ask_api_term_flow_success_with_llm(
         {"id": "spring::ch1", "book_id": "spring", "title": "Actuator"}
     ]
     assert body["graph_fragment"]["edges"] == []
-    assert captured["query"] == "Actuator"
+    assert captured["query"] == 'Explain the term "Actuator" using the retrieved cluster.'
     assert captured["query_type"] == "term"
+    assert captured["retrieval_term"] == "Actuator"
 
 
 def test_ask_api_chapter_flow_success(
@@ -196,7 +199,6 @@ def test_ask_api_chapter_flow_success(
         "/ask",
         json=_payload(
             query_type="chapter",
-            query="Explain selected chapter",
             chapter_id="spring::ch2",
             return_cluster=True,
             return_graph_fragment=False,
@@ -212,6 +214,7 @@ def test_ask_api_chapter_flow_success(
     req = captured["req"]
     assert req.query_type == "chapter"
     assert req.chapter_id == "spring::ch2"
+    assert req.query == 'Summarize the selected chapter "spring::ch2" using the retrieved cluster.'
 
 
 def test_ask_api_records_llm_error_in_meta(
@@ -244,3 +247,77 @@ def test_ask_api_records_llm_error_in_meta(
     body = response.json()
     assert body["answer_markdown"] is None
     assert body["meta"]["llm_error"] == "llm failure"
+
+
+def test_ask_api_rejects_term_request_without_term(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "query_type": "term",
+            "user_query": "Tell me about Actuator",
+            "run_id": 7,
+            "llm_enabled": False,
+        },
+    )
+
+    assert response.status_code == 422
+    assert "term is required for term query_type" in response.text
+
+
+def test_ask_api_chapter_flow_success_with_explicit_query(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+        req = kwargs.get("req")
+        captured["req"] = req
+        return {
+            "schema_version": "cluster.v1",
+            "query": "Explain selected chapter",
+            "query_type": "chapter",
+            "run_id": 7,
+            "enrichment_version": "v2_indexed_sections_bullets",
+            "seed": {"seed_chapter_ids": ["spring::ch2"], "seed_reason": "chapter_selected"},
+            "chapters": [],
+            "edges": [],
+            "evidence": {"sections": [], "bullets": []},
+            "constraints": {},
+        }
+
+    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+
+    response = client.post(
+        "/ask",
+        json=_payload(
+            query_type="chapter",
+            chapter_id="spring::ch2",
+            query="Explain selected chapter",
+            return_cluster=False,
+            return_graph_fragment=False,
+        ),
+    )
+
+    assert response.status_code == 200
+    req = captured["req"]
+    assert req.query == "Explain selected chapter"
+
+
+def test_ask_api_rejects_chapter_request_without_chapter_id(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/ask",
+        json={
+            "query_type": "chapter",
+            "query": "Explain selected chapter",
+            "run_id": 7,
+            "llm_enabled": False,
+        },
+    )
+
+    assert response.status_code == 422
+    assert "chapter_id is required for chapter query_type" in response.text

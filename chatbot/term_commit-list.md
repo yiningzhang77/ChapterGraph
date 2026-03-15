@@ -218,7 +218,7 @@ Add/update cases for:
 
 ### `feat(api): wire explicit anchors through /ask`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
