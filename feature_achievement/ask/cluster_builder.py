@@ -37,6 +37,12 @@ def _score_text(query_tokens: set[str], candidate: str) -> float:
     return overlap / len(query_tokens)
 
 
+def _int_order(value: object) -> int:
+    if isinstance(value, int):
+        return value
+    return 10**9
+
+
 def _pick_seed_ids(session: Session, req: AskRequest) -> tuple[list[str], str]:
     if req.query_type == "chapter":
         chapter_ref = req.chapter_id or req.query
@@ -68,7 +74,11 @@ def _section_title(section: dict[str, object]) -> str:
     return ""
 
 
-def _build_evidence(chapters: list[dict[str, object]], req: AskRequest) -> dict[str, object]:
+def _build_evidence(
+    chapters: list[dict[str, object]],
+    req: AskRequest,
+    primary_chapter_id: str | None = None,
+) -> dict[str, object]:
     query_tokens = set(_normalize_text(req.query).split())
     section_rows: list[dict[str, object]] = []
     bullet_rows: list[dict[str, object]] = []
@@ -89,6 +99,8 @@ def _build_evidence(chapters: list[dict[str, object]], req: AskRequest) -> dict[
 
             section_title = _section_title(section)
             section_score = _score_text(query_tokens, section_title)
+            section_order = section.get("order")
+            is_primary_chapter = chapter_id == primary_chapter_id
 
             bullets_value = section.get("bullets")
             bullet_max_score = 0.0
@@ -108,6 +120,7 @@ def _build_evidence(chapters: list[dict[str, object]], req: AskRequest) -> dict[
                     score = _score_text(query_tokens, bullet_text)
                     if score > bullet_max_score:
                         bullet_max_score = score
+                    bullet_order = bullet.get("order")
 
                     source_refs = bullet.get("source_refs")
                     if source_refs is not None and not isinstance(source_refs, list):
@@ -122,6 +135,9 @@ def _build_evidence(chapters: list[dict[str, object]], req: AskRequest) -> dict[
                             "text_raw": text_raw,
                             "score": score,
                             "source_refs": source_refs,
+                            "_section_order": section_order,
+                            "_bullet_order": bullet_order,
+                            "_is_primary_chapter": is_primary_chapter,
                         }
                     )
 
@@ -133,24 +149,54 @@ def _build_evidence(chapters: list[dict[str, object]], req: AskRequest) -> dict[
                     "title_norm": section.get("title_norm"),
                     "title_raw": section.get("title_raw"),
                     "score": combined_score,
+                    "_section_order": section_order,
+                    "_is_primary_chapter": is_primary_chapter,
                 }
             )
 
-    section_rows.sort(
-        key=lambda row: (
-            -float(row.get("score", 0.0)),
-            str(row.get("chapter_id", "")),
-            str(row.get("section_id", "")),
+    if req.query_type == "chapter":
+        section_rows.sort(
+            key=lambda row: (
+                not bool(row.get("_is_primary_chapter")),
+                _int_order(row.get("_section_order")),
+                str(row.get("chapter_id", "")),
+                str(row.get("section_id", "")),
+            )
         )
-    )
-    bullet_rows.sort(
-        key=lambda row: (
-            -float(row.get("score", 0.0)),
-            str(row.get("chapter_id", "")),
-            str(row.get("section_id", "")),
-            str(row.get("bullet_id", "")),
+        bullet_rows.sort(
+            key=lambda row: (
+                not bool(row.get("_is_primary_chapter")),
+                _int_order(row.get("_section_order")),
+                _int_order(row.get("_bullet_order")),
+                str(row.get("chapter_id", "")),
+                str(row.get("section_id", "")),
+                str(row.get("bullet_id", "")),
+            )
         )
-    )
+    else:
+        section_rows.sort(
+            key=lambda row: (
+                -float(row.get("score", 0.0)),
+                str(row.get("chapter_id", "")),
+                str(row.get("section_id", "")),
+            )
+        )
+        bullet_rows.sort(
+            key=lambda row: (
+                -float(row.get("score", 0.0)),
+                str(row.get("chapter_id", "")),
+                str(row.get("section_id", "")),
+                str(row.get("bullet_id", "")),
+            )
+        )
+
+    for row in section_rows:
+        row.pop("_section_order", None)
+        row.pop("_is_primary_chapter", None)
+    for row in bullet_rows:
+        row.pop("_section_order", None)
+        row.pop("_bullet_order", None)
+        row.pop("_is_primary_chapter", None)
 
     return {
         "sections": section_rows[: req.section_top_k],
@@ -250,7 +296,11 @@ def build_cluster(session: Session, req: AskRequest) -> dict[str, object]:
         and edge["to"] in visible_ids
     ]
 
-    evidence = _build_evidence(chapters, req)
+    evidence = _build_evidence(
+        chapters,
+        req,
+        primary_chapter_id=seed_ids[0] if req.query_type == "chapter" else None,
+    )
 
     chapter_payload = [
         {
