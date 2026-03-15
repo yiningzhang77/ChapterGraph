@@ -287,6 +287,18 @@ function App() {
         return response.json();
     };
 
+    const extractRetrievalWarnings = (result) => {
+        const meta = result && typeof result === "object" ? result.meta : null;
+        if (!meta || typeof meta !== "object") {
+            return null;
+        }
+        const warnings = meta.retrieval_warnings;
+        if (!warnings || typeof warnings !== "object") {
+            return null;
+        }
+        return warnings;
+    };
+
     const onAskSubmit = async () => {
         const query = askQuery.trim();
         const term = askTerm.trim();
@@ -320,15 +332,31 @@ function App() {
             const result = askMode === "chapter"
                 ? await askByChapter(query, selectedChapter.chapterId)
                 : await askByTerm(term, query);
+            const meta = result && typeof result === "object" && result.meta && typeof result.meta === "object"
+                ? result.meta
+                : {};
+            const responseState = typeof meta.response_state === "string" ? meta.response_state : null;
+            const warnings = extractRetrievalWarnings(result);
+            const warningMessage = warnings && typeof warnings.message === "string"
+                ? warnings.message
+                : "";
+            const suggestedTerms = warnings && Array.isArray(warnings.suggested_terms)
+                ? warnings.suggested_terms.filter((value) => typeof value === "string")
+                : [];
             const answer = typeof result.answer_markdown === "string" && result.answer_markdown.trim()
                 ? result.answer_markdown
-                : "No answer returned from /ask.";
+                : responseState === "needs_narrower_term"
+                    ? ""
+                    : "No answer returned from /ask.";
             setMessages((prev) => [
                 ...prev,
                 {
                     role: "assistant",
                     text: answer,
                     queryType: result.query_type,
+                    responseState,
+                    warningMessage,
+                    suggestedTerms,
                     chapterId: askMode === "chapter" ? selectedChapter.chapterId : null,
                 },
             ]);
@@ -475,7 +503,38 @@ function App() {
                                             ? `chapter ${message.chapterId ?? ""}`.trim()
                                             : `term ${message.term ?? ""}`.trim(),
                                 ),
-                                h("div", { className: "askText" }, message.text),
+                                message.role === "assistant"
+                                    && message.responseState === "needs_narrower_term"
+                                    && message.warningMessage
+                                    ? h("div", { className: "askWarning askWarningBlocked" }, message.warningMessage)
+                                    : null,
+                                message.role === "assistant"
+                                    && message.responseState === "needs_narrower_term"
+                                    && Array.isArray(message.suggestedTerms)
+                                    && message.suggestedTerms.length > 0
+                                    ? h(
+                                        "div",
+                                        { className: "askSuggestions" },
+                                        h("div", { className: "askSuggestionsLabel" }, "Try:"),
+                                        h(
+                                            "div",
+                                            { className: "askSuggestionList" },
+                                            ...message.suggestedTerms.map((termValue, termIndex) =>
+                                                h(
+                                                    "span",
+                                                    {
+                                                        key: `suggestion-${index}-${termIndex}`,
+                                                        className: "askSuggestionChip",
+                                                    },
+                                                    termValue,
+                                                ),
+                                            ),
+                                        ),
+                                    )
+                                    : null,
+                                message.text
+                                    ? h("div", { className: "askText" }, message.text)
+                                    : null,
                             ),
                         ),
                 ),

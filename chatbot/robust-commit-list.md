@@ -184,7 +184,7 @@ Add/update tests for:
 
 ### `feat(frontend): render blocked broad-term state and suggested terms`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
