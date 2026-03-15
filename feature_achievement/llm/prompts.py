@@ -38,11 +38,13 @@ def build_prompt(
     query_type: str,
     cluster: dict[str, object],
     retrieval_term: str | None = None,
+    response_guidance: str | None = None,
 ) -> str:
     return (
         f"User question: {query}\n"
         f"Query type: {query_type}\n"
         + (f"Retrieval term: {retrieval_term}\n\n" if retrieval_term else "\n")
+        + (f"Response guidance: {response_guidance}\n\n" if response_guidance else "")
         + _query_type_tasks(query_type)
         + f"Cluster JSON:\n{json.dumps(cluster, ensure_ascii=False)}"
     )

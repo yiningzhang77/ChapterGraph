@@ -106,7 +106,7 @@ The evaluator should include `suggested_terms` in blocked and allowed broad stat
 
 ### `feat(api): block precise broad-term answers and expose response state`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
@@ -142,7 +142,7 @@ Add/update API tests for:
 
 ### `feat(llm): allow broad concept answers with prompt downgrade`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

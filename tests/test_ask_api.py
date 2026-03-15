@@ -129,6 +129,7 @@ def test_ask_api_term_flow_success_with_llm(
         query_type: str,
         cluster: dict[str, object],
         retrieval_term: str | None,
+        response_guidance: str | None,
         model: str,
         timeout_ms: int,
     ) -> str:
@@ -136,6 +137,7 @@ def test_ask_api_term_flow_success_with_llm(
         captured["query_type"] = query_type
         captured["cluster"] = cluster
         captured["retrieval_term"] = retrieval_term
+        captured["response_guidance"] = response_guidance
         captured["model"] = model
         captured["timeout_ms"] = timeout_ms
         return "answer ok"
@@ -161,6 +163,7 @@ def test_ask_api_term_flow_success_with_llm(
     assert captured["query"] == 'Explain the term "Actuator" using the retrieved cluster.'
     assert captured["query_type"] == "term"
     assert captured["retrieval_term"] == "Actuator"
+    assert captured["response_guidance"] is None
 
 
 def test_ask_api_chapter_flow_success(
@@ -247,6 +250,158 @@ def test_ask_api_records_llm_error_in_meta(
     body = response.json()
     assert body["answer_markdown"] is None
     assert body["meta"]["llm_error"] == "llm failure"
+
+
+def test_ask_api_blocks_broad_precise_term_request(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+        return {
+            "schema_version": "cluster.v1",
+            "query": "How does Spring implement data persistence?",
+            "query_type": "term",
+            "run_id": 7,
+            "enrichment_version": "v2_indexed_sections_bullets",
+            "seed": {
+                "seed_chapter_ids": [
+                    "book0::ch1",
+                    "book1::ch2",
+                    "book2::ch3",
+                    "book0::ch4",
+                ],
+                "seed_reason": "term_ilike",
+            },
+            "chapters": [
+                {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
+            ],
+            "edges": [],
+            "evidence": {
+                "sections": [],
+                "bullets": [
+                    {"chapter_id": "book0::ch1"},
+                    {"chapter_id": "book1::ch2"},
+                    {"chapter_id": "book2::ch3"},
+                    {"chapter_id": "book0::ch4"},
+                    {"chapter_id": "book1::ch5"},
+                ],
+            },
+            "constraints": {},
+        }
+
+    def fake_ask_qwen(*args: object, **kwargs: object) -> str:
+        raise AssertionError("ask_qwen should not be called for blocked broad requests")
+
+    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "ask_qwen", fake_ask_qwen)
+
+    response = client.post(
+        "/ask",
+        json=_payload(
+            term="Spring",
+            user_query="How does Spring implement data persistence?",
+            llm_enabled=True,
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["answer_markdown"] is None
+    assert body["meta"]["response_state"] == "needs_narrower_term"
+    warnings = body["meta"]["retrieval_warnings"]
+    assert warnings["state"] == "broad_blocked"
+    assert warnings["term_too_broad"] is True
+    assert warnings["suggested_terms"] == [
+        "Spring Boot",
+        "Spring MVC",
+        "Spring Data",
+        "Spring Security",
+    ]
+
+
+def test_ask_api_allows_broad_definition_term_request(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+        return {
+            "schema_version": "cluster.v1",
+            "query": "What is Spring?",
+            "query_type": "term",
+            "run_id": 7,
+            "enrichment_version": "v2_indexed_sections_bullets",
+            "seed": {
+                "seed_chapter_ids": [
+                    "book0::ch1",
+                    "book1::ch2",
+                    "book2::ch3",
+                    "book0::ch4",
+                ],
+                "seed_reason": "term_ilike",
+            },
+            "chapters": [
+                {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
+            ],
+            "edges": [],
+            "evidence": {
+                "sections": [],
+                "bullets": [
+                    {"chapter_id": "book0::ch1"},
+                    {"chapter_id": "book1::ch2"},
+                    {"chapter_id": "book2::ch3"},
+                    {"chapter_id": "book0::ch4"},
+                    {"chapter_id": "book1::ch5"},
+                ],
+            },
+            "constraints": {},
+        }
+
+    def fake_ask_qwen(
+        query: str,
+        query_type: str,
+        cluster: dict[str, object],
+        retrieval_term: str | None,
+        response_guidance: str | None,
+        model: str,
+        timeout_ms: int,
+    ) -> str:
+        captured["query"] = query
+        captured["response_guidance"] = response_guidance
+        captured["retrieval_term"] = retrieval_term
+        _ = (query_type, cluster, model, timeout_ms)
+        return "broad overview answer"
+
+    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "ask_qwen", fake_ask_qwen)
+
+    response = client.post(
+        "/ask",
+        json=_payload(
+            term="Spring",
+            user_query="What is Spring?",
+            llm_enabled=True,
+        ),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["answer_markdown"] == "broad overview answer"
+    assert body["meta"]["response_state"] == "broad_overview"
+    warnings = body["meta"]["retrieval_warnings"]
+    assert warnings["state"] == "broad_allowed"
+    assert captured["query"] == "What is Spring?"
+    assert captured["retrieval_term"] == "Spring"
+    assert "high-level concept explanation" in str(captured["response_guidance"])
 
 
 def test_ask_api_rejects_term_request_without_term(

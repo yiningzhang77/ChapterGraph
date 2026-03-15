@@ -3,6 +3,11 @@ from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
 from feature_achievement.ask.cluster_builder import build_cluster
+from feature_achievement.ask.retrieval_quality import (
+    broad_overview_prompt_note,
+    default_term_user_query,
+    evaluate_term_retrieval_quality,
+)
 from feature_achievement.db.engine import get_session
 from feature_achievement.llm.qwen_client import ask_qwen
 
@@ -20,18 +25,45 @@ def ask(
     cluster_payload.pop("evidence", None)
     answer_markdown: str | None = None
     llm_error: str | None = None
+    response_guidance: str | None = None
+    response_state: str | None = None
+
+    retrieval_warnings: dict[str, object] | None = None
+    if req.query_type == "term":
+        term = req.term or ""
+        user_query = req.user_query or default_term_user_query(term)
+        retrieval_warnings = evaluate_term_retrieval_quality(
+            term=term,
+            user_query=user_query,
+            user_query_was_default=user_query == default_term_user_query(term),
+            cluster=cluster_payload,
+            evidence=evidence,
+        )
+        if isinstance(retrieval_warnings, dict):
+            state = retrieval_warnings.get("state")
+            if state == "broad_blocked":
+                response_state = "needs_narrower_term"
+            elif state == "broad_allowed":
+                response_state = "broad_overview"
+                suggested_terms = retrieval_warnings.get("suggested_terms")
+                response_guidance = broad_overview_prompt_note(
+                    suggested_terms if isinstance(suggested_terms, list) else []
+                )
+
     if req.llm_enabled:
-        try:
-            answer_markdown = ask_qwen(
-                query=req.user_query if req.query_type == "term" else req.query or "",
-                query_type=req.query_type,
-                cluster=cluster_payload,
-                retrieval_term=req.term if req.query_type == "term" else None,
-                model=req.llm_model,
-                timeout_ms=req.llm_timeout_ms,
-            )
-        except Exception as error:
-            llm_error = str(error)
+        if response_state != "needs_narrower_term":
+            try:
+                answer_markdown = ask_qwen(
+                    query=req.user_query if req.query_type == "term" else req.query or "",
+                    query_type=req.query_type,
+                    cluster=cluster_payload,
+                    retrieval_term=req.term if req.query_type == "term" else None,
+                    response_guidance=response_guidance,
+                    model=req.llm_model,
+                    timeout_ms=req.llm_timeout_ms,
+                )
+            except Exception as error:
+                llm_error = str(error)
 
     graph_fragment: dict[str, object] | None = None
     if req.return_graph_fragment:
@@ -80,6 +112,10 @@ def ask(
         }
 
     meta: dict[str, object] = {"schema_version": "cluster.v1"}
+    if response_state:
+        meta["response_state"] = response_state
+    if retrieval_warnings:
+        meta["retrieval_warnings"] = retrieval_warnings
     if llm_error:
         meta["llm_error"] = llm_error
 

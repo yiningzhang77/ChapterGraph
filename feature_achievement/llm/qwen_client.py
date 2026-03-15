@@ -118,6 +118,7 @@ def _ask_openai_compatible(
     query_type: str,
     cluster: dict[str, object],
     retrieval_term: str | None,
+    response_guidance: str | None,
     model: str,
     timeout_ms: int,
 ) -> str:
@@ -134,6 +135,7 @@ def _ask_openai_compatible(
                     query_type,
                     cluster,
                     retrieval_term=retrieval_term,
+                    response_guidance=response_guidance,
                 ),
             },
         ],
@@ -182,6 +184,7 @@ def ask_qwen(
     query_type: str,
     cluster: dict[str, object],
     retrieval_term: str | None,
+    response_guidance: str | None,
     model: str,
     timeout_ms: int,
 ) -> str:
@@ -189,7 +192,13 @@ def ask_qwen(
     provider = os.getenv("QWEN_PROVIDER", "stub").strip().lower()
     _ = (
         SYSTEM_PROMPT,
-        build_prompt(query, query_type, cluster, retrieval_term=retrieval_term),
+        build_prompt(
+            query,
+            query_type,
+            cluster,
+            retrieval_term=retrieval_term,
+            response_guidance=response_guidance,
+        ),
         model,
         timeout_ms,
     )
@@ -215,6 +224,7 @@ def ask_qwen(
             query_type=query_type,
             cluster=cluster,
             retrieval_term=retrieval_term,
+            response_guidance=response_guidance,
             model=model,
             timeout_ms=timeout_ms,
         )
