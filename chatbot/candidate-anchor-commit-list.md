@@ -205,7 +205,7 @@ Add/update tests for:
 
 ### `feat(api): expose optional suggested-term diagnostics`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

@@ -343,6 +343,12 @@ def test_ask_api_blocks_broad_precise_term_request(
         "Spring Data JPA",
         "Spring Data",
     ]
+    assert warnings["suggested_term_diagnostics"] == [
+        {"term": "data persistence"},
+        {"term": "JdbcTemplate"},
+        {"term": "Spring Data JPA"},
+        {"term": "Spring Data"},
+    ]
     assert warnings["recommendation_reason"] == "spring_persistence"
     assert warnings["recommendation_source"] == "rule_based"
     assert warnings["recommendation_confidence"] == "heuristic"
@@ -431,6 +437,7 @@ def test_ask_api_allows_broad_definition_term_request(
         "data persistence",
         "Spring Security",
     ]
+    assert "suggested_term_diagnostics" not in warnings
     assert warnings["recommendation_reason"] == "spring_fallback"
     assert warnings["recommendation_source"] == "rule_based"
     assert warnings["recommendation_confidence"] == "heuristic"
@@ -505,6 +512,7 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
         "JdbcTemplate",
         "Spring Data JPA",
     ]
+    assert "suggested_term_diagnostics" not in warnings
 
 
 def test_ask_api_retry_with_narrower_term_clears_blocked_state(

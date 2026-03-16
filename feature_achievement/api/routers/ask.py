@@ -71,6 +71,8 @@ def ask(
                     ]
                     if ranked_terms:
                         filtered_suggested_terms = ranked_terms
+                    if ranked_candidates:
+                        retrieval_warnings["suggested_term_diagnostics"] = ranked_candidates
                 suggested_terms = filtered_suggested_terms
                 retrieval_warnings["suggested_terms"] = filtered_suggested_terms
             recommendation_reason = recommendation.get("reason")
