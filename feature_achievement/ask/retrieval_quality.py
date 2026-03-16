@@ -1,9 +1,9 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 from collections.abc import Iterable
 
 
-TERM_TOO_BROAD_SEED_THRESHOLD = 4
+TERM_TOO_BROAD_SEED_THRESHOLD = 5
 EVIDENCE_SCATTER_CHAPTER_THRESHOLD = 5
 EVIDENCE_SCATTER_BOOK_THRESHOLD = 3
 
@@ -64,9 +64,7 @@ def evaluate_term_retrieval_quality(
     if not term_too_broad and not evidence_too_scattered:
         return None
 
-    definition_intent = (
-        not user_query_was_default and _is_definition_intent(user_query)
-    )
+    definition_intent = not user_query_was_default and _is_definition_intent(user_query)
     state = "broad_allowed" if definition_intent else "broad_blocked"
 
     result: dict[str, object] = {

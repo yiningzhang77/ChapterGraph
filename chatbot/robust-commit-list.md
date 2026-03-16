@@ -46,7 +46,7 @@ def evaluate_term_retrieval_quality(
 
 Initial thresholds:
 
-- `seed_count >= 4` -> broad signal
+- `seed_count >= 5` -> broad signal
 - `distinct evidence bullet chapter count >= 5` -> scattered signal
 - `distinct evidence book count >= 3` -> scattered signal
 
@@ -249,7 +249,7 @@ Suggested text:
 
 ### `test(smoke): validate normal, blocked, and broad-overview paths`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

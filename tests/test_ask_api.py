@@ -147,7 +147,9 @@ def test_ask_api_term_flow_success_with_llm(
 
     response = client.post(
         "/ask",
-        json=_payload(llm_enabled=True, return_cluster=True, return_graph_fragment=True),
+        json=_payload(
+            llm_enabled=True, return_cluster=True, return_graph_fragment=True
+        ),
     )
 
     assert response.status_code == 200
@@ -160,7 +162,9 @@ def test_ask_api_term_flow_success_with_llm(
         {"id": "spring::ch1", "book_id": "spring", "title": "Actuator"}
     ]
     assert body["graph_fragment"]["edges"] == []
-    assert captured["query"] == 'Explain the term "Actuator" using the retrieved cluster.'
+    assert (
+        captured["query"] == 'Explain the term "Actuator" using the retrieved cluster.'
+    )
     assert captured["query_type"] == "term"
     assert captured["retrieval_term"] == "Actuator"
     assert captured["response_guidance"] is None
@@ -181,7 +185,10 @@ def test_ask_api_chapter_flow_success(
             "query_type": "chapter",
             "run_id": 7,
             "enrichment_version": "v2_indexed_sections_bullets",
-            "seed": {"seed_chapter_ids": ["spring::ch2"], "seed_reason": "chapter_selected"},
+            "seed": {
+                "seed_chapter_ids": ["spring::ch2"],
+                "seed_reason": "chapter_selected",
+            },
             "chapters": [
                 {
                     "chapter_id": "spring::ch2",
@@ -217,7 +224,10 @@ def test_ask_api_chapter_flow_success(
     req = captured["req"]
     assert req.query_type == "chapter"
     assert req.chapter_id == "spring::ch2"
-    assert req.query == 'Summarize the selected chapter "spring::ch2" using the retrieved cluster.'
+    assert (
+        req.query
+        == 'Summarize the selected chapter "spring::ch2" using the retrieved cluster.'
+    )
 
 
 def test_ask_api_records_llm_error_in_meta(
@@ -269,6 +279,7 @@ def test_ask_api_blocks_broad_precise_term_request(
                     "book1::ch2",
                     "book2::ch3",
                     "book0::ch4",
+                    "book1::ch5",
                 ],
                 "seed_reason": "term_ilike",
             },
@@ -342,6 +353,7 @@ def test_ask_api_allows_broad_definition_term_request(
                     "book1::ch2",
                     "book2::ch3",
                     "book0::ch4",
+                    "book1::ch5",
                 ],
                 "seed_reason": "term_ilike",
             },
@@ -436,7 +448,10 @@ def test_ask_api_chapter_flow_success_with_explicit_query(
             "query_type": "chapter",
             "run_id": 7,
             "enrichment_version": "v2_indexed_sections_bullets",
-            "seed": {"seed_chapter_ids": ["spring::ch2"], "seed_reason": "chapter_selected"},
+            "seed": {
+                "seed_chapter_ids": ["spring::ch2"],
+                "seed_reason": "chapter_selected",
+            },
             "chapters": [],
             "edges": [],
             "evidence": {"sections": [], "bullets": []},

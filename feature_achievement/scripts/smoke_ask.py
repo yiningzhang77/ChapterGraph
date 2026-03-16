@@ -68,9 +68,13 @@ def _validate_cluster(response_body: dict[str, object]) -> dict[str, object]:
         raise RuntimeError("Malformed cluster: evidence.bullets must be a list.")
     for bullet in evidence_bullets:
         if not isinstance(bullet, dict):
-            raise RuntimeError("Malformed cluster: evidence bullet entry must be an object.")
+            raise RuntimeError(
+                "Malformed cluster: evidence bullet entry must be an object."
+            )
         if "source_refs" not in bullet:
-            raise RuntimeError("Malformed cluster: evidence bullet missing source_refs key.")
+            raise RuntimeError(
+                "Malformed cluster: evidence bullet missing source_refs key."
+            )
     if len(chapters) == 0:
         raise RuntimeError("Cluster has no chapters.")
 
@@ -79,7 +83,9 @@ def _validate_cluster(response_body: dict[str, object]) -> dict[str, object]:
 
 def _write_output(data: dict[str, object]) -> None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    OUTPUT_PATH.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     print(f"output_written={OUTPUT_PATH}")
 
 
@@ -123,7 +129,9 @@ def main() -> int:
 
         term_cluster = _validate_cluster(term_response)
         term_seed = term_cluster.get("seed")
-        seed_ids = term_seed.get("seed_chapter_ids") if isinstance(term_seed, dict) else None
+        seed_ids = (
+            term_seed.get("seed_chapter_ids") if isinstance(term_seed, dict) else None
+        )
         if not isinstance(seed_ids, list) or not seed_ids:
             raise SystemExit("Term cluster missing seed_chapter_ids.")
 
@@ -146,6 +154,50 @@ def main() -> int:
             },
         )
         chapter_cluster = _validate_cluster(chapter_response)
+
+        broad_overview_response = _post_ask(
+            client,
+            {
+                "query_type": "term",
+                "term": "Spring",
+                "user_query": "What is Spring?",
+                "run_id": run_id,
+                "enrichment_version": TARGET_VERSION,
+                "max_hops": 2,
+                "llm_enabled": True,
+                "return_cluster": True,
+                "return_graph_fragment": True,
+            },
+        )
+        _validate_cluster(broad_overview_response)
+        broad_overview_meta = broad_overview_response.get("meta")
+        if not isinstance(broad_overview_meta, dict):
+            raise SystemExit("Broad-overview term response missing meta.")
+        if broad_overview_meta.get("response_state") != "broad_overview":
+            raise SystemExit("Expected broad_overview state for overview query.")
+
+        broad_blocked_response = _post_ask(
+            client,
+            {
+                "query_type": "term",
+                "term": "Spring",
+                "user_query": "How does Spring implement data persistence?",
+                "run_id": run_id,
+                "enrichment_version": TARGET_VERSION,
+                "max_hops": 2,
+                "llm_enabled": True,
+                "return_cluster": True,
+                "return_graph_fragment": True,
+            },
+        )
+        _validate_cluster(broad_blocked_response)
+        broad_blocked_meta = broad_blocked_response.get("meta")
+        if not isinstance(broad_blocked_meta, dict):
+            raise SystemExit("Broad-blocked term response missing meta.")
+        if broad_blocked_meta.get("response_state") != "needs_narrower_term":
+            raise SystemExit("Expected needs_narrower_term state for precise broad query.")
+        if broad_blocked_response.get("answer_markdown") is not None:
+            raise SystemExit("Blocked broad query should not include answer_markdown.")
 
         term_chapter_count = len(term_cluster.get("chapters", []))
         term_edge_count = len(term_cluster.get("edges", []))
@@ -173,20 +225,40 @@ def main() -> int:
             chapter_bullet_count = len(bullets) if isinstance(bullets, list) else 0
 
         print(f"term_cluster chapters={term_chapter_count} edges={term_edge_count}")
-        print(f"term_cluster evidence_sections={term_section_count} evidence_bullets={term_bullet_count}")
-        print(f"chapter_cluster chapters={chapter_chapter_count} edges={chapter_edge_count}")
-        print(f"chapter_cluster evidence_sections={chapter_section_count} evidence_bullets={chapter_bullet_count}")
+        print(
+            f"term_cluster evidence_sections={term_section_count} evidence_bullets={term_bullet_count}"
+        )
+        print(
+            f"chapter_cluster chapters={chapter_chapter_count} edges={chapter_edge_count}"
+        )
+        print(
+            f"chapter_cluster evidence_sections={chapter_section_count} evidence_bullets={chapter_bullet_count}"
+        )
 
         term_answer = term_response.get("answer_markdown")
         chapter_answer = chapter_response.get("answer_markdown")
+        broad_overview_answer = broad_overview_response.get("answer_markdown")
+        broad_blocked_answer = broad_blocked_response.get("answer_markdown")
         print(f"term_answer_preview={str(term_answer)[:120]}")
         print(f"chapter_answer_preview={str(chapter_answer)[:120]}")
+        print(
+            "broad_overview_state="
+            + str(broad_overview_meta.get("response_state"))
+        )
+        print(
+            "broad_blocked_state="
+            + str(broad_blocked_meta.get("response_state"))
+        )
+        print(f"broad_overview_answer_preview={str(broad_overview_answer)[:120]}")
+        print(f"broad_blocked_answer_preview={str(broad_blocked_answer)[:120]}")
 
         _write_output(
             {
                 "run_id": run_id,
                 "term_response": term_response,
                 "chapter_response": chapter_response,
+                "broad_overview_response": broad_overview_response,
+                "broad_blocked_response": broad_blocked_response,
             }
         )
         print("smoke_ask passed")

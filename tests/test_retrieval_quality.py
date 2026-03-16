@@ -5,7 +5,9 @@ from feature_achievement.ask.retrieval_quality import (
 )
 
 
-def _cluster(seed_ids: list[str], chapters: list[dict[str, object]]) -> dict[str, object]:
+def _cluster(
+    seed_ids: list[str], chapters: list[dict[str, object]]
+) -> dict[str, object]:
     return {
         "schema_version": "cluster.v1",
         "query": "What is Spring?",
@@ -73,7 +75,7 @@ def test_evaluate_term_retrieval_quality_returns_none_for_clean_retrieval() -> N
 def test_evaluate_term_retrieval_quality_blocks_precise_broad_query() -> None:
     chapters = _chapters(6, book_count=3)
     cluster = _cluster(
-        seed_ids=[row["chapter_id"] for row in chapters[:4]],
+        seed_ids=[row["chapter_id"] for row in chapters[:5]],
         chapters=chapters,
     )
     quality = evaluate_term_retrieval_quality(
@@ -99,7 +101,7 @@ def test_evaluate_term_retrieval_quality_blocks_precise_broad_query() -> None:
 def test_evaluate_term_retrieval_quality_allows_definition_broad_query() -> None:
     chapters = _chapters(5, book_count=2)
     cluster = _cluster(
-        seed_ids=[row["chapter_id"] for row in chapters[:4]],
+        seed_ids=[row["chapter_id"] for row in chapters[:5]],
         chapters=chapters,
     )
     quality = evaluate_term_retrieval_quality(
@@ -120,7 +122,7 @@ def test_evaluate_term_retrieval_quality_allows_definition_broad_query() -> None
 def test_evaluate_term_retrieval_quality_blocks_default_query_for_broad_term() -> None:
     chapters = _chapters(5, book_count=2)
     cluster = _cluster(
-        seed_ids=[row["chapter_id"] for row in chapters[:4]],
+        seed_ids=[row["chapter_id"] for row in chapters[:5]],
         chapters=chapters,
     )
     default_query = default_term_user_query("Spring")
