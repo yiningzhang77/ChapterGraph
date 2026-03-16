@@ -32,6 +32,7 @@ function App() {
     const [askMode, setAskMode] = useState("term");
     const [askQuery, setAskQuery] = useState("");
     const [askTerm, setAskTerm] = useState("");
+    const [narrowingHint, setNarrowingHint] = useState("");
     const [messages, setMessages] = useState([]);
     const [askError, setAskError] = useState("");
     const [askLoading, setAskLoading] = useState(false);
@@ -303,6 +304,7 @@ function App() {
         setAskMode("term");
         setAskTerm(termValue);
         setAskError("");
+        setNarrowingHint(`Term updated to ${termValue}. Review the question and send again.`);
     };
 
     const onAskSubmit = async () => {
@@ -332,6 +334,7 @@ function App() {
         };
         setMessages((prev) => [...prev, userMessage]);
         setAskError("");
+        setNarrowingHint("");
         setAskLoading(true);
 
         try {
@@ -488,6 +491,7 @@ function App() {
                     askLoading ? "Asking..." : "Send",
                 ),
                 askError ? h("div", { className: "askError" }, askError) : null,
+                narrowingHint ? h("div", { className: "askHint" }, narrowingHint) : null,
                 h(
                     "div",
                     { className: "askMessages" },

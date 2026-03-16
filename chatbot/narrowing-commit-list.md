@@ -219,7 +219,7 @@ Optional UI copy:
 
 ### `feat(frontend): add narrowed-term interaction hint`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
