@@ -1,6 +1,7 @@
 from typing import cast
 
 import pytest
+from fastapi import HTTPException
 from sqlmodel import Session
 
 from feature_achievement.ask import candidate_anchor
@@ -102,3 +103,125 @@ def test_rank_candidate_anchors_preserves_input_order_before_reranking(
         "Spring Data",
         "data persistence",
     ]
+
+
+def test_evaluate_candidate_anchor_reuses_build_cluster_and_retrieval_quality(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_build_cluster(*, session: Session, req: object) -> dict[str, object]:
+        captured["session"] = session
+        captured["req"] = req
+        return {
+            "seed": {
+                "seed_chapter_ids": ["book0::ch1", "book0::ch2"],
+                "seed_reason": "term_ilike",
+            },
+            "chapters": [
+                {"chapter_id": "book0::ch1", "book_id": "book0"},
+                {"chapter_id": "book0::ch2", "book_id": "book0"},
+            ],
+            "edges": [],
+            "evidence": {
+                "sections": [],
+                "bullets": [
+                    {"chapter_id": "book0::ch1"},
+                    {"chapter_id": "book0::ch2"},
+                ],
+            },
+        }
+
+    def fake_quality(**kwargs: object) -> dict[str, object] | None:
+        captured["quality_kwargs"] = kwargs
+        return None
+
+    monkeypatch.setattr(candidate_anchor, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(
+        candidate_anchor,
+        "evaluate_term_retrieval_quality",
+        fake_quality,
+    )
+
+    result = candidate_anchor.evaluate_candidate_anchor(
+        term="data persistence",
+        user_query="How does Spring implement data persistence?",
+        run_id=5,
+        enrichment_version="v2_indexed_sections_bullets",
+        session=cast(Session, object()),
+    )
+
+    req = captured["req"]
+    assert getattr(req, "term") == "data persistence"
+    assert getattr(req, "user_query") == "How does Spring implement data persistence?"
+    assert result["expected_response_state"] == "normal"
+    quality_kwargs = captured["quality_kwargs"]
+    assert quality_kwargs["term"] == "data persistence"
+    assert quality_kwargs["user_query_was_default"] is False
+
+
+def test_evaluate_candidate_anchor_maps_broad_allowed_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_build_cluster(*, session: Session, req: object) -> dict[str, object]:
+        _ = (session, req)
+        return {
+            "seed": {
+                "seed_chapter_ids": ["book0::ch1", "book0::ch2"],
+                "seed_reason": "term_ilike",
+            },
+            "chapters": [
+                {"chapter_id": "book0::ch1", "book_id": "book0"},
+                {"chapter_id": "book0::ch2", "book_id": "book0"},
+            ],
+            "edges": [],
+            "evidence": {
+                "sections": [],
+                "bullets": [
+                    {"chapter_id": "book0::ch1"},
+                    {"chapter_id": "book0::ch2"},
+                ],
+            },
+        }
+
+    def fake_quality(**kwargs: object) -> dict[str, object]:
+        _ = kwargs
+        return {"state": "broad_allowed"}
+
+    monkeypatch.setattr(candidate_anchor, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(
+        candidate_anchor,
+        "evaluate_term_retrieval_quality",
+        fake_quality,
+    )
+
+    result = candidate_anchor.evaluate_candidate_anchor(
+        term="Spring",
+        user_query="What is Spring?",
+        run_id=5,
+        enrichment_version="v2_indexed_sections_bullets",
+        session=cast(Session, object()),
+    )
+
+    assert result["focus_state"] == "acceptable"
+    assert result["expected_response_state"] == "broad_overview"
+
+
+def test_evaluate_candidate_anchor_returns_no_seed_when_cluster_builder_raises_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_build_cluster(*, session: Session, req: object) -> dict[str, object]:
+        _ = (session, req)
+        raise HTTPException(status_code=422, detail="No seed chapters found")
+
+    monkeypatch.setattr(candidate_anchor, "build_cluster", fake_build_cluster)
+
+    result = candidate_anchor.evaluate_candidate_anchor(
+        term="Actuatro",
+        user_query="Tell me about Actuatro",
+        run_id=5,
+        enrichment_version="v2_indexed_sections_bullets",
+        session=cast(Session, object()),
+    )
+
+    assert result["expected_response_state"] == "no_seed"

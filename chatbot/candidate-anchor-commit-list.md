@@ -85,7 +85,7 @@ Add unit tests for:
 
 ### `refactor(ask): reuse build_cluster and retrieval-quality logic inside candidate evaluator`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
