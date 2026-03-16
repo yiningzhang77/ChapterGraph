@@ -182,7 +182,7 @@ Add/update tests for:
 
 ### `feat(frontend): make blocked-term suggestions clickable`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

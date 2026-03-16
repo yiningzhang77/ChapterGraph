@@ -299,6 +299,12 @@ function App() {
         return warnings;
     };
 
+    const onSuggestedTermClick = (termValue) => {
+        setAskMode("term");
+        setAskTerm(termValue);
+        setAskError("");
+    };
+
     const onAskSubmit = async () => {
         const query = askQuery.trim();
         const term = askTerm.trim();
@@ -528,10 +534,12 @@ function App() {
                                             { className: "askSuggestionList" },
                                             ...message.suggestedTerms.map((termValue, termIndex) =>
                                                 h(
-                                                    "span",
+                                                    "button",
                                                     {
                                                         key: `suggestion-${index}-${termIndex}`,
                                                         className: "askSuggestionChip",
+                                                        type: "button",
+                                                        onClick: () => onSuggestedTermClick(termValue),
                                                     },
                                                     termValue,
                                                 ),
