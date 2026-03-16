@@ -9,6 +9,7 @@ Goal:
 - expose the capability behind a clear interface
 - let the frontend turn recommendations into a usable next step
 - keep Redis optional and secondary
+- acknowledge that some semantically narrower terms are still unstable retrieval anchors
 
 This series must not redesign `/ask`.
 It should add a replaceable narrowing module on top of the current robust term flow.
@@ -244,7 +245,7 @@ This is just a UX bridge between blocked response and retry.
 
 ### `test(smoke): validate blocked-term narrowing retry flow`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
@@ -289,11 +290,69 @@ python -m pytest -q
 
 - the blocked-term narrowing flow works end to end
 
+### Note
+
+This does not mean every suggested term is equally strong.
+Current real-DB validation already shows that:
+
+- `data persistence`
+- `JdbcTemplate`
+
+can clear the blocked state more reliably than:
+
+- `Spring Data`
+
+for the same persistence-oriented query.
+
+That is a retrieval-calibration issue, not a frontend issue.
+
 ## Commit 07
+
+### `feat(ask): add optional candidate-anchor evaluator before Redis`
+
+Status: `pending`
+
+### Scope
+
+Files:
+- add a small evaluator module if needed
+- backend recommendation path only where candidate terms are ranked
+
+### Changes
+
+Add a light candidate-anchor evaluator that can cheaply probe whether a suggested term is likely to produce a focused retrieval result.
+
+Example purpose:
+
+- `Spring Data` may be semantically narrower than `Spring`
+- but it may still be broad in the current corpus
+- `data persistence` may be a better retry anchor
+
+Suggested direction:
+
+- keep recommender as candidate generator
+- let evaluator rank or filter candidate terms using current retrieval behavior
+
+Possible output:
+
+```json
+{
+  "focus_state": "focused",
+  "expected_response_state": "normal",
+  "seed_count": 3
+}
+```
+
+### Done when
+
+- the system has a path to retrieval-aware recommendation ranking
+- Redis is still not required
+
+## Commit 08
 
 ### `feat(cache): add optional Redis storage for narrowing feedback`
 
-Status: `completed`
+Status: `pending`
 
 ### Scope
 
@@ -349,11 +408,13 @@ Implement in this order:
 4. make suggestion chips clickable
 5. add narrowed-term interaction hint
 6. validate retry flow end to end
-7. only then add optional Redis support
+7. add optional candidate-anchor evaluator
+8. only then add optional Redis support
 
 Reason:
 
 - the recommendation capability must exist before the UI can consume it
+- recommendation quality should improve before storage is added
 - Redis should support the feature, not define it
 
 ### Architecture principle
