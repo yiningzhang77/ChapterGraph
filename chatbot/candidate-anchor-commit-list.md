@@ -169,7 +169,7 @@ Add/update tests for:
 
 ### `feat(api): rerank blocked-term suggested_terms with candidate evaluator`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

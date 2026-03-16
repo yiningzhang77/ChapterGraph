@@ -308,8 +308,18 @@ def test_ask_api_blocks_broad_precise_term_request(
     def fake_ask_qwen(*args: object, **kwargs: object) -> str:
         raise AssertionError("ask_qwen should not be called for blocked broad requests")
 
+    def fake_rank_candidate_anchors(**kwargs: object) -> list[dict[str, object]]:
+        _ = kwargs
+        return [
+            {"term": "data persistence"},
+            {"term": "JdbcTemplate"},
+            {"term": "Spring Data JPA"},
+            {"term": "Spring Data"},
+        ]
+
     monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
     monkeypatch.setattr(ask_router, "ask_qwen", fake_ask_qwen)
+    monkeypatch.setattr(ask_router, "rank_candidate_anchors", fake_rank_candidate_anchors)
 
     response = client.post(
         "/ask",
@@ -328,10 +338,10 @@ def test_ask_api_blocks_broad_precise_term_request(
     assert warnings["state"] == "broad_blocked"
     assert warnings["term_too_broad"] is True
     assert warnings["suggested_terms"] == [
-        "Spring Data",
         "data persistence",
         "JdbcTemplate",
         "Spring Data JPA",
+        "Spring Data",
     ]
     assert warnings["recommendation_reason"] == "spring_persistence"
     assert warnings["recommendation_source"] == "rule_based"
@@ -427,6 +437,74 @@ def test_ask_api_allows_broad_definition_term_request(
     assert captured["query"] == "What is Spring?"
     assert captured["retrieval_term"] == "Spring"
     assert "high-level concept explanation" in str(captured["response_guidance"])
+
+
+def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+        return {
+            "schema_version": "cluster.v1",
+            "query": "How does Spring implement data persistence?",
+            "query_type": "term",
+            "run_id": 7,
+            "enrichment_version": "v2_indexed_sections_bullets",
+            "seed": {
+                "seed_chapter_ids": [
+                    "book0::ch1",
+                    "book1::ch2",
+                    "book2::ch3",
+                    "book0::ch4",
+                    "book1::ch5",
+                ],
+                "seed_reason": "term_ilike",
+            },
+            "chapters": [
+                {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
+            ],
+            "edges": [],
+            "evidence": {
+                "sections": [],
+                "bullets": [
+                    {"chapter_id": "book0::ch1"},
+                    {"chapter_id": "book1::ch2"},
+                    {"chapter_id": "book2::ch3"},
+                    {"chapter_id": "book0::ch4"},
+                    {"chapter_id": "book1::ch5"},
+                ],
+            },
+            "constraints": {},
+        }
+
+    def fake_rank_candidate_anchors(**kwargs: object) -> list[dict[str, object]]:
+        _ = kwargs
+        raise RuntimeError("probe failed")
+
+    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "rank_candidate_anchors", fake_rank_candidate_anchors)
+
+    response = client.post(
+        "/ask",
+        json=_payload(
+            term="Spring",
+            user_query="How does Spring implement data persistence?",
+            llm_enabled=False,
+        ),
+    )
+
+    assert response.status_code == 200
+    warnings = response.json()["meta"]["retrieval_warnings"]
+    assert warnings["suggested_terms"] == [
+        "Spring Data",
+        "data persistence",
+        "JdbcTemplate",
+        "Spring Data JPA",
+    ]
 
 
 def test_ask_api_retry_with_narrower_term_clears_blocked_state(

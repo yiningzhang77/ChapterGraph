@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
+from feature_achievement.ask.candidate_anchor import rank_candidate_anchors
 from feature_achievement.ask.cluster_builder import build_cluster
 from feature_achievement.ask.retrieval_quality import (
     broad_overview_prompt_note,
@@ -47,9 +48,31 @@ def ask(
             )
             suggested_terms = recommendation.get("suggested_terms")
             if isinstance(suggested_terms, list):
-                retrieval_warnings["suggested_terms"] = [
+                filtered_suggested_terms = [
                     value for value in suggested_terms if isinstance(value, str)
                 ]
+                state = retrieval_warnings.get("state")
+                if state == "broad_blocked" and filtered_suggested_terms:
+                    try:
+                        ranked_candidates = rank_candidate_anchors(
+                            terms=filtered_suggested_terms,
+                            user_query=user_query,
+                            run_id=req.run_id,
+                            enrichment_version=req.enrichment_version,
+                            session=session,
+                        )
+                    except Exception:
+                        ranked_candidates = []
+                    ranked_terms = [
+                        candidate.get("term")
+                        for candidate in ranked_candidates
+                        if isinstance(candidate, dict)
+                        and isinstance(candidate.get("term"), str)
+                    ]
+                    if ranked_terms:
+                        filtered_suggested_terms = ranked_terms
+                suggested_terms = filtered_suggested_terms
+                retrieval_warnings["suggested_terms"] = filtered_suggested_terms
             recommendation_reason = recommendation.get("reason")
             if isinstance(recommendation_reason, str):
                 retrieval_warnings["recommendation_reason"] = recommendation_reason
