@@ -120,7 +120,7 @@ Add/update tests to assert:
 
 ### `feat(ask): add ranking heuristic for candidate terms`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

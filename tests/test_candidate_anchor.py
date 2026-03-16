@@ -80,7 +80,7 @@ def test_evaluate_candidate_anchor_returns_no_seed_state(
     assert result["seed_count"] == 0
 
 
-def test_rank_candidate_anchors_preserves_input_order_before_reranking(
+def test_rank_candidate_anchors_places_focused_candidate_before_broad_candidate(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fake_probe(**kwargs: object) -> dict[str, object]:
@@ -100,8 +100,8 @@ def test_rank_candidate_anchors_preserves_input_order_before_reranking(
     )
 
     assert [result["term"] for result in results] == [
-        "Spring Data",
         "data persistence",
+        "Spring Data",
     ]
 
 
@@ -225,3 +225,54 @@ def test_evaluate_candidate_anchor_returns_no_seed_when_cluster_builder_raises_4
     )
 
     assert result["expected_response_state"] == "no_seed"
+
+
+def test_rank_candidate_anchors_places_no_seed_last(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_probe(**kwargs: object) -> dict[str, object]:
+        term = kwargs["term"]
+        if term == "Actuatro":
+            return {"status": "no_seed"}
+        if term == "Spring Data":
+            return {"seed_count": 5, "evidence_chapter_count": 5, "evidence_book_count": 2}
+        return {"seed_count": 2, "evidence_chapter_count": 2, "evidence_book_count": 1}
+
+    monkeypatch.setattr(candidate_anchor, "_probe_candidate_cluster", fake_probe)
+
+    results = candidate_anchor.rank_candidate_anchors(
+        terms=["Actuatro", "Spring Data", "JdbcTemplate"],
+        user_query="How does Spring implement data persistence?",
+        run_id=5,
+        enrichment_version="v2_indexed_sections_bullets",
+        session=cast(Session, object()),
+    )
+
+    assert [result["term"] for result in results] == [
+        "JdbcTemplate",
+        "Spring Data",
+        "Actuatro",
+    ]
+
+
+def test_rank_candidate_anchors_is_deterministic_for_equal_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_probe(**kwargs: object) -> dict[str, object]:
+        _ = kwargs
+        return {"seed_count": 2, "evidence_chapter_count": 2, "evidence_book_count": 1}
+
+    monkeypatch.setattr(candidate_anchor, "_probe_candidate_cluster", fake_probe)
+
+    results = candidate_anchor.rank_candidate_anchors(
+        terms=["JdbcTemplate", "data persistence"],
+        user_query="How does Spring implement data persistence?",
+        run_id=5,
+        enrichment_version="v2_indexed_sections_bullets",
+        session=cast(Session, object()),
+    )
+
+    assert [result["term"] for result in results] == [
+        "JdbcTemplate",
+        "data persistence",
+    ]

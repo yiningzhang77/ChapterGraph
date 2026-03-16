@@ -79,7 +79,7 @@ def rank_candidate_anchors(
     enrichment_version: str,
     session: Session,
 ) -> list[dict[str, object]]:
-    return [
+    results = [
         evaluate_candidate_anchor(
             term=term,
             user_query=user_query,
@@ -89,6 +89,8 @@ def rank_candidate_anchors(
         )
         for term in terms
     ]
+    results.sort(key=_ranking_key)
+    return results
 
 
 def _probe_candidate_cluster(
@@ -139,6 +141,23 @@ def _int_value(value: object) -> int:
     if isinstance(value, int):
         return value
     return 0
+
+
+def _ranking_key(result: dict[str, object]) -> tuple[int, int, int, int, str]:
+    expected_response_state = result.get("expected_response_state")
+    state_rank = {
+        "normal": 0,
+        "broad_overview": 1,
+        "needs_narrower_term": 2,
+        "no_seed": 3,
+    }.get(expected_response_state, 4)
+    return (
+        state_rank,
+        _int_value(result.get("seed_count")),
+        _int_value(result.get("evidence_book_count")),
+        _int_value(result.get("evidence_chapter_count")),
+        str(result.get("term", "")),
+    )
 
 
 def _seed_count(cluster: dict[str, object]) -> int:
