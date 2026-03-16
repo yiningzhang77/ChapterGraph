@@ -198,6 +198,45 @@ def main() -> int:
             raise SystemExit("Expected needs_narrower_term state for precise broad query.")
         if broad_blocked_response.get("answer_markdown") is not None:
             raise SystemExit("Blocked broad query should not include answer_markdown.")
+        broad_blocked_warnings = broad_blocked_meta.get("retrieval_warnings")
+        if not isinstance(broad_blocked_warnings, dict):
+            raise SystemExit("Broad-blocked response missing retrieval_warnings.")
+        suggested_terms = broad_blocked_warnings.get("suggested_terms")
+        if not isinstance(suggested_terms, list) or not suggested_terms:
+            raise SystemExit("Broad-blocked response missing suggested_terms.")
+
+        narrowed_response: dict[str, object] | None = None
+        narrowed_term: str | None = None
+        for suggested_term in suggested_terms:
+            if not isinstance(suggested_term, str):
+                continue
+            candidate = _post_ask(
+                client,
+                {
+                    "query_type": "term",
+                    "term": suggested_term,
+                    "user_query": "How does Spring implement data persistence?",
+                    "run_id": run_id,
+                    "enrichment_version": TARGET_VERSION,
+                    "max_hops": 2,
+                    "llm_enabled": True,
+                    "return_cluster": True,
+                    "return_graph_fragment": True,
+                },
+            )
+            _validate_cluster(candidate)
+            candidate_meta = candidate.get("meta")
+            if not isinstance(candidate_meta, dict):
+                continue
+            if candidate_meta.get("response_state") != "needs_narrower_term":
+                narrowed_response = candidate
+                narrowed_term = suggested_term
+                break
+
+        if narrowed_response is None or narrowed_term is None:
+            raise SystemExit(
+                "No suggested term cleared the blocked broad-term state."
+            )
 
         term_chapter_count = len(term_cluster.get("chapters", []))
         term_edge_count = len(term_cluster.get("edges", []))
@@ -239,6 +278,13 @@ def main() -> int:
         chapter_answer = chapter_response.get("answer_markdown")
         broad_overview_answer = broad_overview_response.get("answer_markdown")
         broad_blocked_answer = broad_blocked_response.get("answer_markdown")
+        narrowed_meta = narrowed_response.get("meta")
+        narrowed_state = (
+            narrowed_meta.get("response_state")
+            if isinstance(narrowed_meta, dict)
+            else None
+        )
+        narrowed_answer = narrowed_response.get("answer_markdown")
         print(f"term_answer_preview={str(term_answer)[:120]}")
         print(f"chapter_answer_preview={str(chapter_answer)[:120]}")
         print(
@@ -251,6 +297,9 @@ def main() -> int:
         )
         print(f"broad_overview_answer_preview={str(broad_overview_answer)[:120]}")
         print(f"broad_blocked_answer_preview={str(broad_blocked_answer)[:120]}")
+        print(f"narrowed_term={narrowed_term}")
+        print(f"narrowed_state={str(narrowed_state)}")
+        print(f"narrowed_answer_preview={str(narrowed_answer)[:120]}")
 
         _write_output(
             {
@@ -259,6 +308,8 @@ def main() -> int:
                 "chapter_response": chapter_response,
                 "broad_overview_response": broad_overview_response,
                 "broad_blocked_response": broad_blocked_response,
+                "narrowed_term": narrowed_term,
+                "narrowed_response": narrowed_response,
             }
         )
         print("smoke_ask passed")

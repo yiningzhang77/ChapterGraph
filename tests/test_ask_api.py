@@ -429,6 +429,110 @@ def test_ask_api_allows_broad_definition_term_request(
     assert "high-level concept explanation" in str(captured["response_guidance"])
 
 
+def test_ask_api_retry_with_narrower_term_clears_blocked_state(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+        req = kwargs.get("req")
+        if getattr(req, "term", None) == "Spring":
+            return {
+                "schema_version": "cluster.v1",
+                "query": "How does Spring implement data persistence?",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": [
+                        "book0::ch1",
+                        "book1::ch2",
+                        "book2::ch3",
+                        "book0::ch4",
+                        "book1::ch5",
+                    ],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [
+                    {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                    {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                    {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                    {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                    {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
+                ],
+                "edges": [],
+                "evidence": {
+                    "sections": [],
+                    "bullets": [
+                        {"chapter_id": "book0::ch1"},
+                        {"chapter_id": "book1::ch2"},
+                        {"chapter_id": "book2::ch3"},
+                        {"chapter_id": "book0::ch4"},
+                        {"chapter_id": "book1::ch5"},
+                    ],
+                },
+                "constraints": {},
+            }
+
+        return {
+            "schema_version": "cluster.v1",
+            "query": "How does Spring implement data persistence?",
+            "query_type": "term",
+            "run_id": 7,
+            "enrichment_version": "v2_indexed_sections_bullets",
+            "seed": {
+                "seed_chapter_ids": ["book1::ch2", "book1::ch5"],
+                "seed_reason": "term_ilike",
+            },
+            "chapters": [
+                {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
+            ],
+            "edges": [],
+            "evidence": {
+                "sections": [],
+                "bullets": [
+                    {"chapter_id": "book1::ch2"},
+                    {"chapter_id": "book1::ch5"},
+                ],
+            },
+            "constraints": {},
+        }
+
+    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+
+    blocked_response = client.post(
+        "/ask",
+        json=_payload(
+            term="Spring",
+            user_query="How does Spring implement data persistence?",
+            llm_enabled=False,
+        ),
+    )
+    assert blocked_response.status_code == 200
+    blocked_body = blocked_response.json()
+    assert blocked_body["meta"]["response_state"] == "needs_narrower_term"
+    assert blocked_body["meta"]["retrieval_warnings"]["suggested_terms"] == [
+        "Spring Data",
+        "data persistence",
+        "JdbcTemplate",
+        "Spring Data JPA",
+    ]
+
+    retry_response = client.post(
+        "/ask",
+        json=_payload(
+            term="data persistence",
+            user_query="How does Spring implement data persistence?",
+            llm_enabled=False,
+        ),
+    )
+    assert retry_response.status_code == 200
+    retry_body = retry_response.json()
+    assert retry_body["meta"]["schema_version"] == "cluster.v1"
+    assert "response_state" not in retry_body["meta"]
+    assert "retrieval_warnings" not in retry_body["meta"]
+
+
 def test_ask_api_rejects_term_request_without_term(
     client: TestClient,
 ) -> None:

@@ -273,7 +273,7 @@ Suggested manual validation example:
    - `data persistence`
    - `JdbcTemplate`
    - `Spring Data JPA`
-3. click `Spring Data`
+3. click `data persistence`
 4. resend
 5. verify the response no longer uses the blocked broad-term state
 
@@ -293,7 +293,7 @@ python -m pytest -q
 
 ### `feat(cache): add optional Redis storage for narrowing feedback`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
