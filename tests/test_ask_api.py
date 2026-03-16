@@ -327,10 +327,10 @@ def test_ask_api_blocks_broad_precise_term_request(
     assert warnings["state"] == "broad_blocked"
     assert warnings["term_too_broad"] is True
     assert warnings["suggested_terms"] == [
-        "Spring Boot",
-        "Spring MVC",
         "Spring Data",
-        "Spring Security",
+        "data persistence",
+        "JdbcTemplate",
+        "Spring Data JPA",
     ]
 
 
@@ -411,6 +411,12 @@ def test_ask_api_allows_broad_definition_term_request(
     assert body["meta"]["response_state"] == "broad_overview"
     warnings = body["meta"]["retrieval_warnings"]
     assert warnings["state"] == "broad_allowed"
+    assert warnings["suggested_terms"] == [
+        "Actuator",
+        "JdbcTemplate",
+        "data persistence",
+        "Spring Security",
+    ]
     assert captured["query"] == "What is Spring?"
     assert captured["retrieval_term"] == "Spring"
     assert "high-level concept explanation" in str(captured["response_guidance"])

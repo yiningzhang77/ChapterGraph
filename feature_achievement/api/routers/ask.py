@@ -8,6 +8,7 @@ from feature_achievement.ask.retrieval_quality import (
     default_term_user_query,
     evaluate_term_retrieval_quality,
 )
+from feature_achievement.ask.term_recommender import recommend_narrower_terms
 from feature_achievement.db.engine import get_session
 from feature_achievement.llm.qwen_client import ask_qwen
 
@@ -40,12 +41,20 @@ def ask(
             evidence=evidence,
         )
         if isinstance(retrieval_warnings, dict):
+            recommendation = recommend_narrower_terms(
+                broad_term=term,
+                user_query=user_query,
+            )
+            suggested_terms = recommendation.get("suggested_terms")
+            if isinstance(suggested_terms, list):
+                retrieval_warnings["suggested_terms"] = [
+                    value for value in suggested_terms if isinstance(value, str)
+                ]
             state = retrieval_warnings.get("state")
             if state == "broad_blocked":
                 response_state = "needs_narrower_term"
             elif state == "broad_allowed":
                 response_state = "broad_overview"
-                suggested_terms = retrieval_warnings.get("suggested_terms")
                 response_guidance = broad_overview_prompt_note(
                     suggested_terms if isinstance(suggested_terms, list) else []
                 )

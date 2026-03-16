@@ -90,12 +90,6 @@ def test_evaluate_term_retrieval_quality_blocks_precise_broad_query() -> None:
     assert quality["state"] == "broad_blocked"
     assert quality["term_too_broad"] is True
     assert quality["evidence_too_scattered"] is True
-    assert quality["suggested_terms"] == [
-        "Spring Boot",
-        "Spring MVC",
-        "Spring Data",
-        "Spring Security",
-    ]
 
 
 def test_evaluate_term_retrieval_quality_allows_definition_broad_query() -> None:

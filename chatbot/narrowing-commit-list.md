@@ -85,7 +85,7 @@ Add tests for:
 
 ### `refactor(ask): move blocked-term suggestions to term recommender`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

@@ -7,23 +7,6 @@ TERM_TOO_BROAD_SEED_THRESHOLD = 5
 EVIDENCE_SCATTER_CHAPTER_THRESHOLD = 5
 EVIDENCE_SCATTER_BOOK_THRESHOLD = 3
 
-TERM_SUGGESTIONS: dict[str, list[str]] = {
-    "spring": ["Spring Boot", "Spring MVC", "Spring Data", "Spring Security"],
-    "data": ["data persistence", "JdbcTemplate", "Spring Data JPA", "data source"],
-    "security": [
-        "Spring Security",
-        "Actuator endpoint security",
-        "authentication",
-    ],
-}
-
-DEFAULT_SUGGESTIONS = [
-    "Actuator",
-    "JdbcTemplate",
-    "data persistence",
-    "Spring Security",
-]
-
 DEFINITION_INTENT_PHRASES = (
     "what is",
     "define",
@@ -49,6 +32,7 @@ def evaluate_term_retrieval_quality(
     cluster: dict[str, object],
     evidence: dict[str, object] | None,
 ) -> dict[str, object] | None:
+    _ = term
     seed_count = _seed_count(cluster)
     evidence_bullet_chapter_count, evidence_book_count = _evidence_spread(
         cluster=cluster,
@@ -77,7 +61,6 @@ def evaluate_term_retrieval_quality(
         "evidence_book_count": evidence_book_count,
         "evidence_chapter_threshold": EVIDENCE_SCATTER_CHAPTER_THRESHOLD,
         "evidence_book_threshold": EVIDENCE_SCATTER_BOOK_THRESHOLD,
-        "suggested_terms": _suggested_terms(term),
     }
 
     if state == "broad_allowed":
@@ -155,11 +138,3 @@ def _is_definition_intent(user_query: str) -> bool:
     if not normalized:
         return False
     return any(phrase in normalized for phrase in DEFINITION_INTENT_PHRASES)
-
-
-def _suggested_terms(term: str) -> list[str]:
-    normalized = " ".join(term.strip().lower().split())
-    for key, suggestions in TERM_SUGGESTIONS.items():
-        if normalized == key or key in normalized:
-            return suggestions
-    return DEFAULT_SUGGESTIONS
