@@ -157,6 +157,7 @@ def test_ask_api_term_flow_success_with_llm(
     assert body["answer_markdown"] == "answer ok"
     assert body["query_type"] == "term"
     assert body["meta"]["schema_version"] == "cluster.v1"
+    assert "retrieval_warnings" not in body["meta"]
     assert body["evidence"]["bullets"][0]["source_refs"] is None
     assert body["graph_fragment"]["nodes"] == [
         {"id": "spring::ch1", "book_id": "spring", "title": "Actuator"}
@@ -332,6 +333,9 @@ def test_ask_api_blocks_broad_precise_term_request(
         "JdbcTemplate",
         "Spring Data JPA",
     ]
+    assert warnings["recommendation_reason"] == "spring_persistence"
+    assert warnings["recommendation_source"] == "rule_based"
+    assert warnings["recommendation_confidence"] == "heuristic"
 
 
 def test_ask_api_allows_broad_definition_term_request(
@@ -417,6 +421,9 @@ def test_ask_api_allows_broad_definition_term_request(
         "data persistence",
         "Spring Security",
     ]
+    assert warnings["recommendation_reason"] == "spring_fallback"
+    assert warnings["recommendation_source"] == "rule_based"
+    assert warnings["recommendation_confidence"] == "heuristic"
     assert captured["query"] == "What is Spring?"
     assert captured["retrieval_term"] == "Spring"
     assert "high-level concept explanation" in str(captured["response_guidance"])

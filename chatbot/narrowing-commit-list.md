@@ -132,7 +132,7 @@ Update API tests to assert:
 
 ### `feat(api): include recommendation metadata in blocked responses`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

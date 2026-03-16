@@ -50,6 +50,17 @@ def ask(
                 retrieval_warnings["suggested_terms"] = [
                     value for value in suggested_terms if isinstance(value, str)
                 ]
+            recommendation_reason = recommendation.get("reason")
+            if isinstance(recommendation_reason, str):
+                retrieval_warnings["recommendation_reason"] = recommendation_reason
+            recommendation_source = recommendation.get("source")
+            if isinstance(recommendation_source, str):
+                retrieval_warnings["recommendation_source"] = recommendation_source
+            recommendation_confidence = recommendation.get("confidence")
+            if isinstance(recommendation_confidence, str):
+                retrieval_warnings["recommendation_confidence"] = (
+                    recommendation_confidence
+                )
             state = retrieval_warnings.get("state")
             if state == "broad_blocked":
                 response_state = "needs_narrower_term"
