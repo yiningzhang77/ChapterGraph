@@ -204,6 +204,27 @@ def main() -> int:
         suggested_terms = broad_blocked_warnings.get("suggested_terms")
         if not isinstance(suggested_terms, list) or not suggested_terms:
             raise SystemExit("Broad-blocked response missing suggested_terms.")
+        suggested_term_diagnostics = broad_blocked_warnings.get("suggested_term_diagnostics")
+        if not isinstance(suggested_term_diagnostics, list):
+            raise SystemExit(
+                "Broad-blocked response missing suggested_term_diagnostics."
+            )
+        if (
+            "data persistence" in suggested_terms
+            and "Spring Data" in suggested_terms
+            and suggested_terms.index("data persistence") > suggested_terms.index("Spring Data")
+        ):
+            raise SystemExit(
+                "Expected data persistence to rank above Spring Data in reranked suggestions."
+            )
+        if (
+            "JdbcTemplate" in suggested_terms
+            and "Spring Data" in suggested_terms
+            and suggested_terms.index("JdbcTemplate") > suggested_terms.index("Spring Data")
+        ):
+            raise SystemExit(
+                "Expected JdbcTemplate to rank above Spring Data in reranked suggestions."
+            )
 
         narrowed_response: dict[str, object] | None = None
         narrowed_term: str | None = None
@@ -297,6 +318,7 @@ def main() -> int:
         )
         print(f"broad_overview_answer_preview={str(broad_overview_answer)[:120]}")
         print(f"broad_blocked_answer_preview={str(broad_blocked_answer)[:120]}")
+        print(f"broad_blocked_suggested_terms={suggested_terms}")
         print(f"narrowed_term={narrowed_term}")
         print(f"narrowed_state={str(narrowed_state)}")
         print(f"narrowed_answer_preview={str(narrowed_answer)[:120]}")

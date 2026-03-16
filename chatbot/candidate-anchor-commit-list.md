@@ -255,7 +255,7 @@ Add/update tests for:
 
 ### `test(smoke): validate real-DB candidate-anchor reranking`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
