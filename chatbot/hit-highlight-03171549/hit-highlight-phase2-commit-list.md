@@ -52,7 +52,7 @@ This state should be independent from the current-response hit map.
 
 ### `feat(frontend): increment session hit history from current ask results`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

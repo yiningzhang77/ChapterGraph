@@ -5,7 +5,7 @@ import {
     draw,
     findNodeAtPosition,
 } from "./graph-core-dist/buildView.js";
-import { buildAskHitMap } from "./askHitMap.js";
+import { buildAskHitMap, updateSessionHitHistory } from "./askHitMap.js";
 import { reducer as coreReducer } from "./graph-core-dist/reducer.js";
 
 const API =
@@ -363,15 +363,19 @@ function App() {
             const result = askMode === "chapter"
                 ? await askByChapter(query, selectedChapter.chapterId)
                 : await askByTerm(term, query);
+            const currentAskHitMap = buildAskHitMap(result, {
+                queryType: askMode,
+                queryLabel: askMode === "term"
+                    ? term
+                    : selectedChapter?.chapterId ?? null,
+            });
             dispatch({
                 type: "SET_ASK_HIT_MAP",
-                askHitMap: buildAskHitMap(result, {
-                    queryType: askMode,
-                    queryLabel: askMode === "term"
-                        ? term
-                        : selectedChapter?.chapterId ?? null,
-                }),
+                askHitMap: currentAskHitMap,
             });
+            setSessionHitHistory((previousHistory) =>
+                updateSessionHitHistory(previousHistory, currentAskHitMap),
+            );
             const meta = result && typeof result === "object" && result.meta && typeof result.meta === "object"
                 ? result.meta
                 : {};

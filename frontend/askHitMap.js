@@ -81,3 +81,26 @@ export function buildAskHitMap(result, context = {}) {
 
     return hitMap;
 }
+
+export function updateSessionHitHistory(previousHistory, currentHitMap, timestamp = Date.now()) {
+    const nextHistory = {
+        ...(previousHistory && typeof previousHistory === "object" ? previousHistory : {}),
+    };
+    const entries = currentHitMap && typeof currentHitMap === "object"
+        ? Object.entries(currentHitMap)
+        : [];
+
+    entries.forEach(([chapterId]) => {
+        const currentEntry = nextHistory[chapterId];
+        const sessionHitCount = currentEntry && typeof currentEntry === "object"
+            && typeof currentEntry.sessionHitCount === "number"
+            ? currentEntry.sessionHitCount
+            : 0;
+        nextHistory[chapterId] = {
+            sessionHitCount: sessionHitCount + 1,
+            lastHitAt: timestamp,
+        };
+    });
+
+    return nextHistory;
+}
