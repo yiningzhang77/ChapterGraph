@@ -234,7 +234,7 @@ Cover at least:
 
 ### `test(smoke): validate session heat behavior in the running UI`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
@@ -265,6 +265,14 @@ Then verify in the browser:
 3. hover repeated nodes
 4. switch run
 5. confirm heat reset
+
+Local code-path validation completed on `2026-03-17 16:06`:
+
+- `powershell -ExecutionPolicy Bypass -File scripts/run_local.ps1`
+- `node --test frontend/askHitMap.test.js`
+- `python -m feature_achievement.scripts.smoke_ask`
+
+Visual confirmation of the rendered heat map remains a browser check.
 
 ### Done when
 
