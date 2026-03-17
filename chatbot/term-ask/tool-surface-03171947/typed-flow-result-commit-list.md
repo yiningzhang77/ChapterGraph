@@ -122,7 +122,7 @@ Add or update tests.
 
 `test(smoke): validate typed flow result refactor`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
@@ -142,6 +142,15 @@ python -m pytest -q
 - tests pass
 - smoke passes
 - response behavior is unchanged
+
+### Validation completed on 2026-03-17 20:25
+
+```powershell
+python -m pytest -q tests/test_term_flow.py tests/test_chapter_flow.py tests/test_ask_api.py
+python -m feature_achievement.scripts.smoke_ask
+python -m feature_achievement.scripts.smoke_ask_cluster
+python -m pytest -q
+```
 
 ## Recommended Order
 
