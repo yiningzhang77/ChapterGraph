@@ -107,7 +107,7 @@ No behavior change.
 
 ### `test(ask): add focused coverage for unified tool surface exports`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
