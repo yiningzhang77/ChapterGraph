@@ -16,7 +16,9 @@ from feature_achievement.ask.tool_contracts import (
     ClusterToolResult,
     NarrowingRecommendationToolResult,
     RetrievalQualityToolResult,
+    TermAnswerToolResult,
 )
+from feature_achievement.llm.qwen_client import ask_qwen
 
 
 def build_term_cluster_tool(
@@ -138,6 +140,43 @@ def rank_candidate_anchors_tool(
             diagnostic.term for diagnostic in diagnostics if diagnostic.term
         ],
         diagnostics=diagnostics,
+    )
+
+
+def generate_term_answer_tool(
+    *,
+    term: str,
+    user_query: str | None,
+    cluster: dict[str, object],
+    response_mode: str,
+    response_guidance: str | None,
+    llm_enabled: bool,
+    llm_model: str | None,
+    llm_timeout_ms: int,
+) -> TermAnswerToolResult:
+    _ = response_mode
+    if not llm_enabled:
+        return TermAnswerToolResult(answer_markdown=None, llm_error=None)
+
+    try:
+        answer_markdown = ask_qwen(
+            query=user_query or default_term_user_query(term),
+            query_type="term",
+            cluster=cluster,
+            retrieval_term=term,
+            response_guidance=response_guidance,
+            model=llm_model,
+            timeout_ms=llm_timeout_ms,
+        )
+    except Exception as error:
+        return TermAnswerToolResult(
+            answer_markdown=None,
+            llm_error=str(error),
+        )
+
+    return TermAnswerToolResult(
+        answer_markdown=answer_markdown,
+        llm_error=None,
     )
 
 

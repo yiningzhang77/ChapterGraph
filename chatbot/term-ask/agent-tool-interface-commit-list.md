@@ -117,7 +117,7 @@ The wrapper layer should preserve:
 
 ### `feat(ask): add term answer generation tool wrapper`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
