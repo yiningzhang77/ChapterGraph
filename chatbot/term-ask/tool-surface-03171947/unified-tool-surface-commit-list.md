@@ -51,7 +51,7 @@ First pass should be thin:
 
 ### `refactor(ask): switch term_flow.py to unified tool surface imports`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
