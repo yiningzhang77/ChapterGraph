@@ -132,7 +132,7 @@ Do not overdesign this into registry tests.
 
 ### `test(smoke): validate unified tool surface refactor preserves ask behavior`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
@@ -157,6 +157,12 @@ Goal:
 ### Done when
 
 - tests and smoke still pass
+
+Validation completed on `2026-03-17 20:11`:
+
+- `python -m pytest -q`
+- `python -m feature_achievement.scripts.smoke_ask`
+- `python -m feature_achievement.scripts.smoke_ask_cluster`
 
 ## Optional Commit 06
 
