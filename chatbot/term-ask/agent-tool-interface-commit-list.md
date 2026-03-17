@@ -208,7 +208,7 @@ If needed, clean imports or intermediate payload handling so the router remains 
 
 ### `test(ask): cover capability wrappers and term_flow behavior preservation`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
