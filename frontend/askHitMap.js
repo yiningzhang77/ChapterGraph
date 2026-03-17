@@ -104,3 +104,32 @@ export function updateSessionHitHistory(previousHistory, currentHitMap, timestam
 
     return nextHistory;
 }
+
+export function mergeAskHitWithSessionHistory(currentHitMap, sessionHitHistory) {
+    const mergedHitMap = {};
+    const currentEntries = currentHitMap && typeof currentHitMap === "object"
+        ? Object.entries(currentHitMap)
+        : [];
+
+    currentEntries.forEach(([chapterId, hitEntry]) => {
+        if (!hitEntry || typeof hitEntry !== "object") {
+            return;
+        }
+        const sessionEntry = sessionHitHistory && typeof sessionHitHistory === "object"
+            ? sessionHitHistory[chapterId]
+            : null;
+        mergedHitMap[chapterId] = {
+            ...hitEntry,
+            sessionHitCount: sessionEntry && typeof sessionEntry === "object"
+                && typeof sessionEntry.sessionHitCount === "number"
+                ? sessionEntry.sessionHitCount
+                : 0,
+            lastHitAt: sessionEntry && typeof sessionEntry === "object"
+                && typeof sessionEntry.lastHitAt === "number"
+                ? sessionEntry.lastHitAt
+                : null,
+        };
+    });
+
+    return mergedHitMap;
+}

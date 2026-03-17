@@ -81,7 +81,7 @@ Keep the first version simple:
 
 ### `feat(frontend): merge current-hit and session-hit data for graph rendering`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

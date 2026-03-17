@@ -27,6 +27,8 @@ export type AskHitInfo = {
     evidenceBulletCount: number;
     queryType: string | null;
     queryLabel: string | null;
+    sessionHitCount?: number;
+    lastHitAt?: number | null;
 };
 
 export type ViewNode = {

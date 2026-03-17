@@ -5,7 +5,11 @@ import {
     draw,
     findNodeAtPosition,
 } from "./graph-core-dist/buildView.js";
-import { buildAskHitMap, updateSessionHitHistory } from "./askHitMap.js";
+import {
+    buildAskHitMap,
+    mergeAskHitWithSessionHistory,
+    updateSessionHitHistory,
+} from "./askHitMap.js";
 import { reducer as coreReducer } from "./graph-core-dist/reducer.js";
 
 const API =
@@ -369,12 +373,18 @@ function App() {
                     ? term
                     : selectedChapter?.chapterId ?? null,
             });
-            dispatch({
-                type: "SET_ASK_HIT_MAP",
-                askHitMap: currentAskHitMap,
-            });
             setSessionHitHistory((previousHistory) =>
-                updateSessionHitHistory(previousHistory, currentAskHitMap),
+                {
+                    const nextHistory = updateSessionHitHistory(previousHistory, currentAskHitMap);
+                    dispatch({
+                        type: "SET_ASK_HIT_MAP",
+                        askHitMap: mergeAskHitWithSessionHistory(
+                            currentAskHitMap,
+                            nextHistory,
+                        ),
+                    });
+                    return nextHistory;
+                },
             );
             const meta = result && typeof result === "object" && result.meta && typeof result.meta === "object"
                 ? result.meta
