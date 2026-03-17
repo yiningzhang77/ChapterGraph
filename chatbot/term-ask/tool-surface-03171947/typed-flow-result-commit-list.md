@@ -38,7 +38,7 @@ Add explicit flow result contracts to [tool_contracts.py](C:/Users/hy/ChapterGra
 
 `refactor(ask): make term_flow return TermFlowResult`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

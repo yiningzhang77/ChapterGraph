@@ -18,6 +18,7 @@ from feature_achievement.ask.tool_contracts import (
     ClusterToolResult,
     NarrowingRecommendationToolResult,
     RetrievalQualityToolResult,
+    TermFlowResult,
 )
 
 
@@ -25,7 +26,7 @@ def run_term_flow(
     *,
     req: AskRequest,
     session: Session,
-) -> dict[str, object]:
+) -> TermFlowResult:
     cluster_result = _build_term_cluster(req=req, session=session)
     quality_result = _evaluate_term_quality(req=req, cluster_result=cluster_result)
     narrowing_result = _build_narrowing_payload(
@@ -40,16 +41,15 @@ def run_term_flow(
         quality_result=quality_result,
         narrowing_result=narrowing_result,
     )
-    return {
-        "cluster_payload": cluster_result.cluster,
-        "evidence": cluster_result.evidence,
-        "retrieval_warnings": quality_result.retrieval_warnings,
-        "narrowing_payload": narrowing_result,
-        "response_state": answer_result["response_state"],
-        "response_guidance": answer_result["response_guidance"],
-        "answer_markdown": answer_result["answer_markdown"],
-        "llm_error": answer_result["llm_error"],
-    }
+    return TermFlowResult(
+        cluster_payload=cluster_result.cluster,
+        evidence=cluster_result.evidence,
+        retrieval_warnings=quality_result.retrieval_warnings,
+        response_state=answer_result["response_state"],
+        response_guidance=answer_result["response_guidance"],
+        answer_markdown=answer_result["answer_markdown"],
+        llm_error=answer_result["llm_error"],
+    )
 
 
 def _build_term_cluster(

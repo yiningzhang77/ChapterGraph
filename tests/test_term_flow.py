@@ -11,6 +11,7 @@ from feature_achievement.ask.tool_contracts import (
     NarrowingRecommendationToolResult,
     RetrievalQualityToolResult,
     TermAnswerToolResult,
+    TermFlowResult,
 )
 
 
@@ -65,19 +66,19 @@ def test_run_term_flow_returns_service_shape(monkeypatch) -> None:
         session=cast(Session, object()),
     )
 
-    assert result == {
-        "cluster_payload": {"chapters": [], "edges": [], "seed": {"seed_chapter_ids": ["spring::ch1"]}},
-        "evidence": {"bullets": []},
-        "retrieval_warnings": {"state": "normal"},
-        "narrowing_payload": {
-            "suggested_terms": ["Actuator"],
-            "suggested_term_diagnostics": None,
+    assert result == TermFlowResult(
+        cluster_payload={
+            "chapters": [],
+            "edges": [],
+            "seed": {"seed_chapter_ids": ["spring::ch1"]},
         },
-        "response_state": None,
-        "response_guidance": None,
-        "answer_markdown": "answer",
-        "llm_error": None,
-    }
+        evidence={"bullets": []},
+        retrieval_warnings={"state": "normal"},
+        response_state=None,
+        response_guidance=None,
+        answer_markdown="answer",
+        llm_error=None,
+    )
 
 
 def test_build_narrowing_payload_reranks_blocked_candidates(monkeypatch) -> None:
@@ -332,8 +333,8 @@ def test_run_term_flow_preserves_broad_overview_state(monkeypatch) -> None:
 
     result = term_flow.run_term_flow(req=req, session=cast(Session, object()))
 
-    assert result["response_state"] == "broad_overview"
-    assert result["answer_markdown"] == "overview answer"
+    assert result.response_state == "broad_overview"
+    assert result.answer_markdown == "overview answer"
 
 
 def test_run_term_flow_preserves_blocked_state(monkeypatch) -> None:
@@ -373,5 +374,5 @@ def test_run_term_flow_preserves_blocked_state(monkeypatch) -> None:
 
     result = term_flow.run_term_flow(req=req, session=cast(Session, object()))
 
-    assert result["response_state"] == "needs_narrower_term"
-    assert result["answer_markdown"] is None
+    assert result.response_state == "needs_narrower_term"
+    assert result.answer_markdown is None
