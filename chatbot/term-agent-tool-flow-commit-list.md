@@ -127,7 +127,7 @@ The router should receive already assembled narrowing payloads from the service.
 
 ### `refactor(ask): move answer-mode selection and LLM call into term_flow`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

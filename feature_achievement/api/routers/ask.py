@@ -3,9 +3,6 @@ from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
 from feature_achievement.ask.cluster_builder import build_cluster
-from feature_achievement.ask.retrieval_quality import (
-    broad_overview_prompt_note,
-)
 from feature_achievement.ask.term_flow import run_term_flow
 from feature_achievement.db.engine import get_session
 from feature_achievement.llm.qwen_client import ask_qwen
@@ -38,6 +35,21 @@ def ask(
             if isinstance(term_flow_result.get("response_state"), str)
             else None
         )
+        response_guidance = (
+            term_flow_result.get("response_guidance")
+            if isinstance(term_flow_result.get("response_guidance"), str)
+            else None
+        )
+        answer_markdown = (
+            term_flow_result.get("answer_markdown")
+            if isinstance(term_flow_result.get("answer_markdown"), str)
+            else None
+        )
+        llm_error = (
+            term_flow_result.get("llm_error")
+            if isinstance(term_flow_result.get("llm_error"), str)
+            else None
+        )
     else:
         cluster = build_cluster(session=session, req=req)
         evidence = cluster.get("evidence") if isinstance(cluster.get("evidence"), dict) else None
@@ -45,23 +57,13 @@ def ask(
         cluster_payload.pop("evidence", None)
         retrieval_warnings = None
         response_state = None
+        response_guidance = None
+        answer_markdown = None
+        llm_error = None
 
-    answer_markdown: str | None = None
-    llm_error: str | None = None
-    response_guidance: str | None = None
     if req.query_type == "term":
-        if isinstance(retrieval_warnings, dict):
-            state = retrieval_warnings.get("state")
-            if state == "broad_blocked":
-                response_state = "needs_narrower_term"
-            elif state == "broad_allowed":
-                response_state = "broad_overview"
-                suggested_terms = retrieval_warnings.get("suggested_terms")
-                response_guidance = broad_overview_prompt_note(
-                    suggested_terms if isinstance(suggested_terms, list) else []
-                )
-
-    if req.llm_enabled:
+        pass
+    elif req.llm_enabled:
         if response_state != "needs_narrower_term":
             try:
                 answer_markdown = ask_qwen(

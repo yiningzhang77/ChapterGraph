@@ -265,3 +265,131 @@ def test_build_narrowing_payload_keeps_rule_order_when_rerank_fails(monkeypatch)
         "JdbcTemplate",
     ]
     assert result["suggested_term_diagnostics"] is None
+
+
+def test_generate_term_answer_calls_llm_for_normal_state(monkeypatch) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Actuator",
+        user_query="Tell me about Actuator",
+        run_id=5,
+        llm_enabled=True,
+    )
+    captured: dict[str, object] = {}
+
+    def fake_ask_qwen(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return "answer ok"
+
+    monkeypatch.setattr(term_flow, "ask_qwen", fake_ask_qwen)
+
+    result = term_flow._generate_term_answer(
+        req=req,
+        cluster_result={"cluster_payload": {"chapters": []}},
+        quality_result={"retrieval_warnings": None, "response_state": None},
+        narrowing_result={"suggested_terms": None},
+    )
+
+    assert result == {
+        "response_state": None,
+        "response_guidance": None,
+        "answer_markdown": "answer ok",
+        "llm_error": None,
+    }
+    assert captured["query"] == "Tell me about Actuator"
+    assert captured["retrieval_term"] == "Actuator"
+
+
+def test_generate_term_answer_adds_broad_overview_guidance(monkeypatch) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Spring",
+        user_query="What is Spring?",
+        run_id=5,
+        llm_enabled=True,
+    )
+    captured: dict[str, object] = {}
+
+    def fake_ask_qwen(**kwargs: object) -> str:
+        captured.update(kwargs)
+        return "overview"
+
+    monkeypatch.setattr(term_flow, "ask_qwen", fake_ask_qwen)
+
+    result = term_flow._generate_term_answer(
+        req=req,
+        cluster_result={"cluster_payload": {"chapters": []}},
+        quality_result={
+            "retrieval_warnings": {"state": "broad_allowed"},
+            "response_state": "broad_overview",
+        },
+        narrowing_result={"suggested_terms": ["Spring Data", "JdbcTemplate"]},
+    )
+
+    assert result["response_state"] == "broad_overview"
+    assert result["answer_markdown"] == "overview"
+    assert "high-level concept explanation" in str(result["response_guidance"])
+    assert "Spring Data" in str(captured["response_guidance"])
+
+
+def test_generate_term_answer_skips_llm_for_blocked_state(monkeypatch) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Spring",
+        user_query="How does Spring implement data persistence?",
+        run_id=5,
+        llm_enabled=True,
+    )
+
+    monkeypatch.setattr(
+        term_flow,
+        "ask_qwen",
+        lambda **kwargs: (_ for _ in ()).throw(AssertionError("should not call llm")),
+    )
+
+    result = term_flow._generate_term_answer(
+        req=req,
+        cluster_result={"cluster_payload": {"chapters": []}},
+        quality_result={
+            "retrieval_warnings": {"state": "broad_blocked"},
+            "response_state": "needs_narrower_term",
+        },
+        narrowing_result={"suggested_terms": ["JdbcTemplate"]},
+    )
+
+    assert result == {
+        "response_state": "needs_narrower_term",
+        "response_guidance": None,
+        "answer_markdown": None,
+        "llm_error": None,
+    }
+
+
+def test_generate_term_answer_preserves_llm_error(monkeypatch) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Actuator",
+        user_query="Tell me about Actuator",
+        run_id=5,
+        llm_enabled=True,
+    )
+
+    monkeypatch.setattr(
+        term_flow,
+        "ask_qwen",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("llm failure")),
+    )
+
+    result = term_flow._generate_term_answer(
+        req=req,
+        cluster_result={"cluster_payload": {"chapters": []}},
+        quality_result={"retrieval_warnings": None, "response_state": None},
+        narrowing_result={"suggested_terms": None},
+    )
+
+    assert result == {
+        "response_state": None,
+        "response_guidance": None,
+        "answer_markdown": None,
+        "llm_error": "llm failure",
+    }

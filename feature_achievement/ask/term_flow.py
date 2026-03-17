@@ -6,10 +6,12 @@ from feature_achievement.api.schemas.ask import AskRequest
 from feature_achievement.ask.candidate_anchor import rank_candidate_anchors
 from feature_achievement.ask.cluster_builder import build_cluster
 from feature_achievement.ask.retrieval_quality import (
+    broad_overview_prompt_note,
     default_term_user_query,
     evaluate_term_retrieval_quality,
 )
 from feature_achievement.ask.term_recommender import recommend_narrower_terms
+from feature_achievement.llm.qwen_client import ask_qwen
 
 
 def run_term_flow(
@@ -36,9 +38,7 @@ def run_term_flow(
         "evidence": cluster_result.get("evidence"),
         "retrieval_warnings": quality_result.get("retrieval_warnings"),
         "narrowing_payload": narrowing_result,
-        "response_state": quality_result.get("response_state")
-        if quality_result.get("response_state") is not None
-        else answer_result.get("response_state"),
+        "response_state": answer_result.get("response_state"),
         "response_guidance": answer_result.get("response_guidance"),
         "answer_markdown": answer_result.get("answer_markdown"),
         "llm_error": answer_result.get("llm_error"),
@@ -191,10 +191,47 @@ def _generate_term_answer(
     quality_result: dict[str, object],
     narrowing_result: dict[str, object],
 ) -> dict[str, object]:
-    _ = (req, cluster_result, quality_result, narrowing_result)
+    cluster_payload = cluster_result.get("cluster_payload")
+    retrieval_warnings = quality_result.get("retrieval_warnings")
+    if not isinstance(cluster_payload, dict):
+        return {
+            "response_state": None,
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
+        }
+
+    response_state = (
+        quality_result.get("response_state")
+        if isinstance(quality_result.get("response_state"), str)
+        else None
+    )
+    suggested_terms = narrowing_result.get("suggested_terms")
+    response_guidance: str | None = None
+    if response_state == "broad_overview":
+        response_guidance = broad_overview_prompt_note(
+            suggested_terms if isinstance(suggested_terms, list) else []
+        )
+
+    answer_markdown: str | None = None
+    llm_error: str | None = None
+    if req.llm_enabled and response_state != "needs_narrower_term":
+        try:
+            answer_markdown = ask_qwen(
+                query=req.user_query or default_term_user_query(req.term or ""),
+                query_type=req.query_type,
+                cluster=cluster_payload,
+                retrieval_term=req.term,
+                response_guidance=response_guidance,
+                model=req.llm_model,
+                timeout_ms=req.llm_timeout_ms,
+            )
+        except Exception as error:
+            llm_error = str(error)
+
     return {
-        "response_state": None,
-        "response_guidance": None,
-        "answer_markdown": None,
-        "llm_error": None,
+        "response_state": response_state,
+        "response_guidance": response_guidance,
+        "answer_markdown": answer_markdown,
+        "llm_error": llm_error,
     }
