@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { buildAskHitMap } from "./askHitMap.js";
+import {
+    buildAskHitMap,
+    mergeAskHitWithSessionHistory,
+    updateSessionHitHistory,
+} from "./askHitMap.js";
 
 test("seed nodes score higher than cluster-only nodes", () => {
     const hitMap = buildAskHitMap(
@@ -82,4 +86,123 @@ test("new result produces a separate hit map without accumulation", () => {
     assert.equal(secondMap["book::ch1"], undefined);
     assert.equal(secondMap["book::ch2"].queryType, "chapter");
     assert.equal(secondMap["book::ch2"].queryLabel, "book::ch2");
+});
+
+test("first hit creates sessionHitCount = 1", () => {
+    const currentHitMap = {
+        "book::ch1": {
+            chapterId: "book::ch1",
+            currentHitScore: 4,
+        },
+    };
+
+    const nextHistory = updateSessionHitHistory({}, currentHitMap, 1000);
+
+    assert.deepEqual(nextHistory, {
+        "book::ch1": {
+            sessionHitCount: 1,
+            lastHitAt: 1000,
+        },
+    });
+});
+
+test("repeated hit increments count", () => {
+    const currentHitMap = {
+        "book::ch1": {
+            chapterId: "book::ch1",
+            currentHitScore: 4,
+        },
+    };
+
+    const firstHistory = updateSessionHitHistory({}, currentHitMap, 1000);
+    const secondHistory = updateSessionHitHistory(firstHistory, currentHitMap, 2000);
+
+    assert.deepEqual(secondHistory, {
+        "book::ch1": {
+            sessionHitCount: 2,
+            lastHitAt: 2000,
+        },
+    });
+});
+
+test("different chapters accumulate independently", () => {
+    const firstHitMap = {
+        "book::ch1": {
+            chapterId: "book::ch1",
+            currentHitScore: 4,
+        },
+    };
+    const secondHitMap = {
+        "book::ch2": {
+            chapterId: "book::ch2",
+            currentHitScore: 3,
+        },
+    };
+
+    const firstHistory = updateSessionHitHistory({}, firstHitMap, 1000);
+    const secondHistory = updateSessionHitHistory(firstHistory, secondHitMap, 2000);
+
+    assert.deepEqual(secondHistory, {
+        "book::ch1": {
+            sessionHitCount: 1,
+            lastHitAt: 1000,
+        },
+        "book::ch2": {
+            sessionHitCount: 1,
+            lastHitAt: 2000,
+        },
+    });
+});
+
+test("run change reset clears session heat in merged render payload", () => {
+    const currentHitMap = {
+        "book::ch1": {
+            chapterId: "book::ch1",
+            currentHitScore: 4,
+        },
+    };
+    const sessionHistory = updateSessionHitHistory({}, currentHitMap, 1000);
+
+    const mergedBeforeReset = mergeAskHitWithSessionHistory(currentHitMap, sessionHistory);
+    const mergedAfterReset = mergeAskHitWithSessionHistory(currentHitMap, {});
+
+    assert.equal(mergedBeforeReset["book::ch1"].sessionHitCount, 1);
+    assert.equal(mergedBeforeReset["book::ch1"].lastHitAt, 1000);
+    assert.equal(mergedAfterReset["book::ch1"].sessionHitCount, 0);
+    assert.equal(mergedAfterReset["book::ch1"].lastHitAt, null);
+});
+
+test("current-hit replacement preserves accumulated session heat for same run", () => {
+    const firstHitMap = {
+        "book::ch1": {
+            chapterId: "book::ch1",
+            currentHitScore: 4,
+            queryType: "term",
+            queryLabel: "Spring",
+        },
+    };
+    const secondHitMap = {
+        "book::ch1": {
+            chapterId: "book::ch1",
+            currentHitScore: 2,
+            queryType: "term",
+            queryLabel: "JdbcTemplate",
+        },
+        "book::ch2": {
+            chapterId: "book::ch2",
+            currentHitScore: 1,
+            queryType: "term",
+            queryLabel: "JdbcTemplate",
+        },
+    };
+
+    const firstHistory = updateSessionHitHistory({}, firstHitMap, 1000);
+    const secondHistory = updateSessionHitHistory(firstHistory, secondHitMap, 2000);
+    const mergedSecondMap = mergeAskHitWithSessionHistory(secondHitMap, secondHistory);
+
+    assert.equal(mergedSecondMap["book::ch1"].currentHitScore, 2);
+    assert.equal(mergedSecondMap["book::ch1"].queryLabel, "JdbcTemplate");
+    assert.equal(mergedSecondMap["book::ch1"].sessionHitCount, 2);
+    assert.equal(mergedSecondMap["book::ch1"].lastHitAt, 2000);
+    assert.equal(mergedSecondMap["book::ch2"].sessionHitCount, 1);
 });

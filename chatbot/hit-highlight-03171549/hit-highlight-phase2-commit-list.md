@@ -207,7 +207,7 @@ This keeps Phase 2 scoped to one active graph session.
 
 ### `test(frontend): cover session hit accumulation behavior`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
