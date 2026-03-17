@@ -98,7 +98,7 @@ The service should return a structured internal result such as:
 
 ### `refactor(ask): move narrowing generation and candidate reranking into term_flow`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

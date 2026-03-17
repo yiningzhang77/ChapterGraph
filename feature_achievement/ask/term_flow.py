@@ -3,11 +3,13 @@ from __future__ import annotations
 from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest
+from feature_achievement.ask.candidate_anchor import rank_candidate_anchors
 from feature_achievement.ask.cluster_builder import build_cluster
 from feature_achievement.ask.retrieval_quality import (
     default_term_user_query,
     evaluate_term_retrieval_quality,
 )
+from feature_achievement.ask.term_recommender import recommend_narrower_terms
 
 
 def run_term_flow(
@@ -103,10 +105,82 @@ def _build_narrowing_payload(
     cluster_result: dict[str, object],
     quality_result: dict[str, object],
 ) -> dict[str, object]:
-    _ = (req, session, cluster_result, quality_result)
+    _ = cluster_result
+    retrieval_warnings = quality_result.get("retrieval_warnings")
+    if not isinstance(retrieval_warnings, dict):
+        return {
+            "suggested_terms": None,
+            "suggested_term_diagnostics": None,
+            "recommendation_reason": None,
+            "recommendation_source": None,
+            "recommendation_confidence": None,
+        }
+
+    term = req.term or ""
+    user_query = req.user_query or default_term_user_query(term)
+    recommendation = recommend_narrower_terms(
+        broad_term=term,
+        user_query=user_query,
+    )
+
+    suggested_terms: list[str] = []
+    raw_suggested_terms = recommendation.get("suggested_terms")
+    if isinstance(raw_suggested_terms, list):
+        suggested_terms = [
+            value for value in raw_suggested_terms if isinstance(value, str)
+        ]
+
+    diagnostics: list[dict[str, object]] | None = None
+    if retrieval_warnings.get("state") == "broad_blocked" and suggested_terms:
+        try:
+            ranked_candidates = rank_candidate_anchors(
+                terms=suggested_terms,
+                user_query=user_query,
+                run_id=req.run_id,
+                enrichment_version=req.enrichment_version,
+                session=session,
+            )
+        except Exception:
+            ranked_candidates = []
+        ranked_terms = [
+            candidate.get("term")
+            for candidate in ranked_candidates
+            if isinstance(candidate, dict)
+            and isinstance(candidate.get("term"), str)
+        ]
+        if ranked_terms:
+            suggested_terms = ranked_terms
+        if ranked_candidates:
+            diagnostics = ranked_candidates
+
+    retrieval_warnings["suggested_terms"] = suggested_terms
+    if diagnostics is not None:
+        retrieval_warnings["suggested_term_diagnostics"] = diagnostics
+
+    recommendation_reason = recommendation.get("reason")
+    if isinstance(recommendation_reason, str):
+        retrieval_warnings["recommendation_reason"] = recommendation_reason
+
+    recommendation_source = recommendation.get("source")
+    if isinstance(recommendation_source, str):
+        retrieval_warnings["recommendation_source"] = recommendation_source
+
+    recommendation_confidence = recommendation.get("confidence")
+    if isinstance(recommendation_confidence, str):
+        retrieval_warnings["recommendation_confidence"] = recommendation_confidence
+
     return {
-        "suggested_terms": None,
-        "suggested_term_diagnostics": None,
+        "suggested_terms": suggested_terms,
+        "suggested_term_diagnostics": diagnostics,
+        "recommendation_reason": recommendation_reason
+        if isinstance(recommendation_reason, str)
+        else None,
+        "recommendation_source": recommendation_source
+        if isinstance(recommendation_source, str)
+        else None,
+        "recommendation_confidence": recommendation_confidence
+        if isinstance(recommendation_confidence, str)
+        else None,
     }
 
 

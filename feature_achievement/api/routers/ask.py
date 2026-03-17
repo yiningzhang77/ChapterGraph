@@ -2,13 +2,11 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
-from feature_achievement.ask.candidate_anchor import rank_candidate_anchors
 from feature_achievement.ask.cluster_builder import build_cluster
 from feature_achievement.ask.retrieval_quality import (
     broad_overview_prompt_note,
 )
 from feature_achievement.ask.term_flow import run_term_flow
-from feature_achievement.ask.term_recommender import recommend_narrower_terms
 from feature_achievement.db.engine import get_session
 from feature_achievement.llm.qwen_client import ask_qwen
 
@@ -52,58 +50,13 @@ def ask(
     llm_error: str | None = None
     response_guidance: str | None = None
     if req.query_type == "term":
-        term = req.term or ""
-        user_query = req.user_query or req.query or ""
         if isinstance(retrieval_warnings, dict):
-            recommendation = recommend_narrower_terms(
-                broad_term=term,
-                user_query=user_query,
-            )
-            suggested_terms = recommendation.get("suggested_terms")
-            if isinstance(suggested_terms, list):
-                filtered_suggested_terms = [
-                    value for value in suggested_terms if isinstance(value, str)
-                ]
-                state = retrieval_warnings.get("state")
-                if state == "broad_blocked" and filtered_suggested_terms:
-                    try:
-                        ranked_candidates = rank_candidate_anchors(
-                            terms=filtered_suggested_terms,
-                            user_query=user_query,
-                            run_id=req.run_id,
-                            enrichment_version=req.enrichment_version,
-                            session=session,
-                        )
-                    except Exception:
-                        ranked_candidates = []
-                    ranked_terms = [
-                        candidate.get("term")
-                        for candidate in ranked_candidates
-                        if isinstance(candidate, dict)
-                        and isinstance(candidate.get("term"), str)
-                    ]
-                    if ranked_terms:
-                        filtered_suggested_terms = ranked_terms
-                    if ranked_candidates:
-                        retrieval_warnings["suggested_term_diagnostics"] = ranked_candidates
-                suggested_terms = filtered_suggested_terms
-                retrieval_warnings["suggested_terms"] = filtered_suggested_terms
-            recommendation_reason = recommendation.get("reason")
-            if isinstance(recommendation_reason, str):
-                retrieval_warnings["recommendation_reason"] = recommendation_reason
-            recommendation_source = recommendation.get("source")
-            if isinstance(recommendation_source, str):
-                retrieval_warnings["recommendation_source"] = recommendation_source
-            recommendation_confidence = recommendation.get("confidence")
-            if isinstance(recommendation_confidence, str):
-                retrieval_warnings["recommendation_confidence"] = (
-                    recommendation_confidence
-                )
             state = retrieval_warnings.get("state")
             if state == "broad_blocked":
                 response_state = "needs_narrower_term"
             elif state == "broad_allowed":
                 response_state = "broad_overview"
+                suggested_terms = retrieval_warnings.get("suggested_terms")
                 response_guidance = broad_overview_prompt_note(
                     suggested_terms if isinstance(suggested_terms, list) else []
                 )

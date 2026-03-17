@@ -351,18 +351,90 @@ def test_ask_api_blocks_broad_precise_term_request(
     def fake_ask_qwen(*args: object, **kwargs: object) -> str:
         raise AssertionError("ask_qwen should not be called for blocked broad requests")
 
-    def fake_rank_candidate_anchors(**kwargs: object) -> list[dict[str, object]]:
-        _ = kwargs
-        return [
-            {"term": "data persistence"},
-            {"term": "JdbcTemplate"},
-            {"term": "Spring Data JPA"},
-            {"term": "Spring Data"},
-        ]
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
+        _ = (args, kwargs)
+        return {
+            "cluster_payload": {
+                "schema_version": "cluster.v1",
+                "query": "How does Spring implement data persistence?",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": [
+                        "book0::ch1",
+                        "book1::ch2",
+                        "book2::ch3",
+                        "book0::ch4",
+                        "book1::ch5",
+                    ],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [
+                    {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                    {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                    {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                    {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                    {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
+                ],
+                "edges": [],
+                "constraints": {},
+            },
+            "evidence": {
+                "sections": [],
+                "bullets": [
+                    {"chapter_id": "book0::ch1"},
+                    {"chapter_id": "book1::ch2"},
+                    {"chapter_id": "book2::ch3"},
+                    {"chapter_id": "book0::ch4"},
+                    {"chapter_id": "book1::ch5"},
+                ],
+            },
+            "retrieval_warnings": {
+                "state": "broad_blocked",
+                "term_too_broad": True,
+                "evidence_too_scattered": True,
+                "suggested_terms": [
+                    "data persistence",
+                    "JdbcTemplate",
+                    "Spring Data JPA",
+                    "Spring Data",
+                ],
+                "suggested_term_diagnostics": [
+                    {"term": "data persistence"},
+                    {"term": "JdbcTemplate"},
+                    {"term": "Spring Data JPA"},
+                    {"term": "Spring Data"},
+                ],
+                "recommendation_reason": "spring_persistence",
+                "recommendation_source": "rule_based",
+                "recommendation_confidence": "heuristic",
+            },
+            "narrowing_payload": {
+                "suggested_terms": [
+                    "data persistence",
+                    "JdbcTemplate",
+                    "Spring Data JPA",
+                    "Spring Data",
+                ],
+                "suggested_term_diagnostics": [
+                    {"term": "data persistence"},
+                    {"term": "JdbcTemplate"},
+                    {"term": "Spring Data JPA"},
+                    {"term": "Spring Data"},
+                ],
+                "recommendation_reason": "spring_persistence",
+                "recommendation_source": "rule_based",
+                "recommendation_confidence": "heuristic",
+            },
+            "response_state": "needs_narrower_term",
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
+        }
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     monkeypatch.setattr(ask_router, "ask_qwen", fake_ask_qwen)
-    monkeypatch.setattr(ask_router, "rank_candidate_anchors", fake_rank_candidate_anchors)
 
     response = client.post(
         "/ask",
@@ -445,10 +517,27 @@ def test_ask_api_allows_broad_definition_term_request(
                 "state": "broad_allowed",
                 "term_too_broad": True,
                 "evidence_too_scattered": True,
+                "suggested_terms": [
+                    "Actuator",
+                    "JdbcTemplate",
+                    "data persistence",
+                    "Spring Security",
+                ],
+                "recommendation_reason": "spring_fallback",
+                "recommendation_source": "rule_based",
+                "recommendation_confidence": "heuristic",
             },
             "narrowing_payload": {
-                "suggested_terms": None,
+                "suggested_terms": [
+                    "Actuator",
+                    "JdbcTemplate",
+                    "data persistence",
+                    "Spring Security",
+                ],
                 "suggested_term_diagnostics": None,
+                "recommendation_reason": "spring_fallback",
+                "recommendation_source": "rule_based",
+                "recommendation_confidence": "heuristic",
             },
             "response_state": "broad_overview",
             "response_guidance": None,
@@ -550,10 +639,27 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
                 "state": "broad_blocked",
                 "term_too_broad": True,
                 "evidence_too_scattered": True,
+                "suggested_terms": [
+                    "Spring Data",
+                    "data persistence",
+                    "JdbcTemplate",
+                    "Spring Data JPA",
+                ],
+                "recommendation_reason": "spring_persistence",
+                "recommendation_source": "rule_based",
+                "recommendation_confidence": "heuristic",
             },
             "narrowing_payload": {
-                "suggested_terms": None,
+                "suggested_terms": [
+                    "Spring Data",
+                    "data persistence",
+                    "JdbcTemplate",
+                    "Spring Data JPA",
+                ],
                 "suggested_term_diagnostics": None,
+                "recommendation_reason": "spring_persistence",
+                "recommendation_source": "rule_based",
+                "recommendation_confidence": "heuristic",
             },
             "response_state": "needs_narrower_term",
             "response_guidance": None,
@@ -561,12 +667,7 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
             "llm_error": None,
         }
 
-    def fake_rank_candidate_anchors(**kwargs: object) -> list[dict[str, object]]:
-        _ = kwargs
-        raise RuntimeError("probe failed")
-
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
-    monkeypatch.setattr(ask_router, "rank_candidate_anchors", fake_rank_candidate_anchors)
 
     response = client.post(
         "/ask",
@@ -636,10 +737,27 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                     "state": "broad_blocked",
                     "term_too_broad": True,
                     "evidence_too_scattered": True,
+                    "suggested_terms": [
+                        "Spring Data",
+                        "data persistence",
+                        "JdbcTemplate",
+                        "Spring Data JPA",
+                    ],
+                    "recommendation_reason": "spring_persistence",
+                    "recommendation_source": "rule_based",
+                    "recommendation_confidence": "heuristic",
                 },
                 "narrowing_payload": {
-                    "suggested_terms": None,
+                    "suggested_terms": [
+                        "Spring Data",
+                        "data persistence",
+                        "JdbcTemplate",
+                        "Spring Data JPA",
+                    ],
                     "suggested_term_diagnostics": None,
+                    "recommendation_reason": "spring_persistence",
+                    "recommendation_source": "rule_based",
+                    "recommendation_confidence": "heuristic",
                 },
                 "response_state": "needs_narrower_term",
                 "response_guidance": None,

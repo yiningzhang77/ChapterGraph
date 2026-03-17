@@ -131,3 +131,137 @@ def test_evaluate_term_quality_maps_blocked_state(monkeypatch) -> None:
         },
         "response_state": "needs_narrower_term",
     }
+
+
+def test_build_narrowing_payload_reranks_blocked_candidates(monkeypatch) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Spring",
+        user_query="How does Spring implement data persistence?",
+        run_id=5,
+        llm_enabled=False,
+    )
+
+    monkeypatch.setattr(
+        term_flow,
+        "recommend_narrower_terms",
+        lambda **kwargs: {
+            "reason": "spring_persistence",
+            "suggested_terms": [
+                "Spring Data",
+                "data persistence",
+                "JdbcTemplate",
+            ],
+            "source": "rule_based",
+            "confidence": "heuristic",
+        },
+    )
+    monkeypatch.setattr(
+        term_flow,
+        "rank_candidate_anchors",
+        lambda **kwargs: [
+            {"term": "data persistence"},
+            {"term": "JdbcTemplate"},
+            {"term": "Spring Data"},
+        ],
+    )
+
+    quality_result = {
+        "retrieval_warnings": {
+            "state": "broad_blocked",
+            "term_too_broad": True,
+        },
+        "response_state": "needs_narrower_term",
+    }
+
+    result = term_flow._build_narrowing_payload(
+        req=req,
+        session=cast(Session, object()),
+        cluster_result={},
+        quality_result=quality_result,
+    )
+
+    assert result == {
+        "suggested_terms": [
+            "data persistence",
+            "JdbcTemplate",
+            "Spring Data",
+        ],
+        "suggested_term_diagnostics": [
+            {"term": "data persistence"},
+            {"term": "JdbcTemplate"},
+            {"term": "Spring Data"},
+        ],
+        "recommendation_reason": "spring_persistence",
+        "recommendation_source": "rule_based",
+        "recommendation_confidence": "heuristic",
+    }
+    assert quality_result["retrieval_warnings"] == {
+        "state": "broad_blocked",
+        "term_too_broad": True,
+        "suggested_terms": [
+            "data persistence",
+            "JdbcTemplate",
+            "Spring Data",
+        ],
+        "suggested_term_diagnostics": [
+            {"term": "data persistence"},
+            {"term": "JdbcTemplate"},
+            {"term": "Spring Data"},
+        ],
+        "recommendation_reason": "spring_persistence",
+        "recommendation_source": "rule_based",
+        "recommendation_confidence": "heuristic",
+    }
+
+
+def test_build_narrowing_payload_keeps_rule_order_when_rerank_fails(monkeypatch) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Spring",
+        user_query="How does Spring implement data persistence?",
+        run_id=5,
+        llm_enabled=False,
+    )
+
+    monkeypatch.setattr(
+        term_flow,
+        "recommend_narrower_terms",
+        lambda **kwargs: {
+            "reason": "spring_persistence",
+            "suggested_terms": [
+                "Spring Data",
+                "data persistence",
+                "JdbcTemplate",
+            ],
+            "source": "rule_based",
+            "confidence": "heuristic",
+        },
+    )
+    monkeypatch.setattr(
+        term_flow,
+        "rank_candidate_anchors",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("probe failed")),
+    )
+
+    quality_result = {
+        "retrieval_warnings": {
+            "state": "broad_blocked",
+            "term_too_broad": True,
+        },
+        "response_state": "needs_narrower_term",
+    }
+
+    result = term_flow._build_narrowing_payload(
+        req=req,
+        session=cast(Session, object()),
+        cluster_result={},
+        quality_result=quality_result,
+    )
+
+    assert result["suggested_terms"] == [
+        "Spring Data",
+        "data persistence",
+        "JdbcTemplate",
+    ]
+    assert result["suggested_term_diagnostics"] is None
