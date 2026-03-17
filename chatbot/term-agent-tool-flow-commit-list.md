@@ -160,7 +160,7 @@ The router should not decide whether term mode should answer or block.
 
 ### `refactor(api): keep router focused on request/response shaping`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
