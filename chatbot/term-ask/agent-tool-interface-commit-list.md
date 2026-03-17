@@ -239,7 +239,7 @@ Cover at least:
 
 ### `test(smoke): validate typed tool-interface term flow against current real db`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
@@ -267,6 +267,12 @@ The point is to verify:
 
 - smoke still passes against the current DB
 - term flow remains behaviorally stable after interface tightening
+
+Validation completed on `2026-03-17 19:14`:
+
+- `python -m pytest -q`
+- `python -m feature_achievement.scripts.smoke_ask`
+- `python -m feature_achievement.scripts.smoke_ask_cluster`
 
 ## Execution Notes
 
