@@ -50,7 +50,7 @@ Do not add runtime registry logic yet.
 
 ### `feat(ask): add cluster and retrieval-quality tool wrappers`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
