@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
-from feature_achievement.ask.cluster_builder import build_cluster
+from feature_achievement.ask.chapter_flow import run_chapter_flow
 from feature_achievement.ask.term_flow import run_term_flow
 from feature_achievement.db.engine import get_session
-from feature_achievement.llm.qwen_client import ask_qwen
 
 router = APIRouter(prefix="", tags=["ask"])
 
@@ -94,35 +93,7 @@ def _run_chapter_request(
     req: AskRequest,
     session: Session,
 ) -> dict[str, object]:
-    cluster = build_cluster(session=session, req=req)
-    evidence = cluster.get("evidence") if isinstance(cluster.get("evidence"), dict) else None
-    cluster_payload = dict(cluster)
-    cluster_payload.pop("evidence", None)
-    answer_markdown: str | None = None
-    llm_error: str | None = None
-
-    if req.llm_enabled:
-        try:
-            answer_markdown = ask_qwen(
-                query=req.query or "",
-                query_type=req.query_type,
-                cluster=cluster_payload,
-                retrieval_term=None,
-                response_guidance=None,
-                model=req.llm_model,
-                timeout_ms=req.llm_timeout_ms,
-            )
-        except Exception as error:
-            llm_error = str(error)
-
-    return {
-        "cluster_payload": cluster_payload,
-        "evidence": evidence,
-        "retrieval_warnings": None,
-        "response_state": None,
-        "answer_markdown": answer_markdown,
-        "llm_error": llm_error,
-    }
+    return _coerce_term_flow_result(run_chapter_flow(req=req, session=session))
 
 
 @router.post("/ask", response_model=AskResponse)

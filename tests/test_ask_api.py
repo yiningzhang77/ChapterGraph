@@ -162,12 +162,17 @@ def test_ask_api_chapter_flow_success(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured: dict[str, object] = {}
-
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_chapter_flow(*args: object, **kwargs: object) -> dict[str, object]:
         req = kwargs.get("req")
-        captured["req"] = req
+        assert req is not None
+        assert req.query_type == "chapter"
+        assert req.chapter_id == "spring::ch2"
+        assert (
+            req.query
+            == 'Summarize the selected chapter "spring::ch2" using the retrieved cluster.'
+        )
         return {
+            "cluster_payload": {
             "schema_version": "cluster.v1",
             "query": "Explain selected chapter",
             "query_type": "chapter",
@@ -187,11 +192,17 @@ def test_ask_api_chapter_flow_success(
                 }
             ],
             "edges": [],
-            "evidence": {"sections": [], "bullets": []},
             "constraints": {},
+            },
+            "evidence": {"sections": [], "bullets": []},
+            "retrieval_warnings": None,
+            "response_state": None,
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
         }
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_chapter_flow", fake_run_chapter_flow)
 
     response = client.post(
         "/ask",
@@ -209,13 +220,6 @@ def test_ask_api_chapter_flow_success(
     assert body["cluster"]["seed"]["seed_reason"] == "chapter_selected"
     assert body["evidence"] == {"sections": [], "bullets": []}
     assert body["graph_fragment"] is None
-    req = captured["req"]
-    assert req.query_type == "chapter"
-    assert req.chapter_id == "spring::ch2"
-    assert (
-        req.query
-        == 'Summarize the selected chapter "spring::ch2" using the retrieved cluster.'
-    )
 
 
 def test_ask_api_records_llm_error_in_meta(
@@ -751,12 +755,12 @@ def test_ask_api_chapter_flow_success_with_explicit_query(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    captured: dict[str, object] = {}
-
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_chapter_flow(*args: object, **kwargs: object) -> dict[str, object]:
         req = kwargs.get("req")
-        captured["req"] = req
+        assert req is not None
+        assert req.query == "Explain selected chapter"
         return {
+            "cluster_payload": {
             "schema_version": "cluster.v1",
             "query": "Explain selected chapter",
             "query_type": "chapter",
@@ -768,11 +772,17 @@ def test_ask_api_chapter_flow_success_with_explicit_query(
             },
             "chapters": [],
             "edges": [],
-            "evidence": {"sections": [], "bullets": []},
             "constraints": {},
+            },
+            "evidence": {"sections": [], "bullets": []},
+            "retrieval_warnings": None,
+            "response_state": None,
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
         }
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_chapter_flow", fake_run_chapter_flow)
 
     response = client.post(
         "/ask",
@@ -786,8 +796,6 @@ def test_ask_api_chapter_flow_success_with_explicit_query(
     )
 
     assert response.status_code == 200
-    req = captured["req"]
-    assert req.query == "Explain selected chapter"
 
 
 def test_ask_api_rejects_chapter_request_without_chapter_id(

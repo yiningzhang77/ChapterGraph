@@ -14,6 +14,16 @@ class ClusterToolResult:
 
 
 @dataclass(frozen=True)
+class ChapterClusterToolResult:
+    chapter_id: str
+    run_id: int
+    enrichment_version: str
+    cluster: dict[str, object]
+    evidence: dict[str, object] | None
+    seed_ids: list[str]
+
+
+@dataclass(frozen=True)
 class RetrievalQualityToolResult:
     state: str | None
     retrieval_warnings: dict[str, object] | None
