@@ -107,19 +107,45 @@ export function updateSessionHitHistory(previousHistory, currentHitMap, timestam
 
 export function mergeAskHitWithSessionHistory(currentHitMap, sessionHitHistory) {
     const mergedHitMap = {};
-    const currentEntries = currentHitMap && typeof currentHitMap === "object"
-        ? Object.entries(currentHitMap)
-        : [];
+    const currentEntries = currentHitMap && typeof currentHitMap === "object" ? currentHitMap : {};
+    const sessionEntries = sessionHitHistory && typeof sessionHitHistory === "object"
+        ? sessionHitHistory
+        : {};
+    const chapterIds = new Set([
+        ...Object.keys(currentEntries),
+        ...Object.keys(sessionEntries),
+    ]);
 
-    currentEntries.forEach(([chapterId, hitEntry]) => {
-        if (!hitEntry || typeof hitEntry !== "object") {
-            return;
-        }
-        const sessionEntry = sessionHitHistory && typeof sessionHitHistory === "object"
-            ? sessionHitHistory[chapterId]
-            : null;
+    chapterIds.forEach((chapterId) => {
+        const hitEntry = currentEntries[chapterId];
+        const sessionEntry = sessionEntries[chapterId];
         mergedHitMap[chapterId] = {
-            ...hitEntry,
+            chapterId,
+            bookId: hitEntry && typeof hitEntry === "object" ? hitEntry.bookId ?? null : null,
+            currentHitScore: hitEntry && typeof hitEntry === "object"
+                && typeof hitEntry.currentHitScore === "number"
+                ? hitEntry.currentHitScore
+                : 0,
+            isSeed: hitEntry && typeof hitEntry === "object" ? Boolean(hitEntry.isSeed) : false,
+            isClusterNode: hitEntry && typeof hitEntry === "object"
+                ? Boolean(hitEntry.isClusterNode)
+                : false,
+            evidenceSectionCount: hitEntry && typeof hitEntry === "object"
+                && typeof hitEntry.evidenceSectionCount === "number"
+                ? hitEntry.evidenceSectionCount
+                : 0,
+            evidenceBulletCount: hitEntry && typeof hitEntry === "object"
+                && typeof hitEntry.evidenceBulletCount === "number"
+                ? hitEntry.evidenceBulletCount
+                : 0,
+            queryType: hitEntry && typeof hitEntry === "object"
+                && typeof hitEntry.queryType === "string"
+                ? hitEntry.queryType
+                : null,
+            queryLabel: hitEntry && typeof hitEntry === "object"
+                && typeof hitEntry.queryLabel === "string"
+                ? hitEntry.queryLabel
+                : null,
             sessionHitCount: sessionEntry && typeof sessionEntry === "object"
                 && typeof sessionEntry.sessionHitCount === "number"
                 ? sessionEntry.sessionHitCount

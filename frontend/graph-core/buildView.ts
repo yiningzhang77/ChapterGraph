@@ -37,25 +37,37 @@ function mixWithWhite(hex: string, amount: number) {
 function getAskHitVisuals(node: ViewNode) {
     const askHit = node.askHit;
     const score = askHit?.currentHitScore ?? 0;
-    if (!score) return null;
     const sessionHitCount = askHit?.sessionHitCount ?? 0;
+    const hasCurrentHit = score > 0;
+    const hasSessionHeat = sessionHitCount > 0;
+    if (!hasCurrentHit && !hasSessionHeat) return null;
     const level = score >= 5 ? "strong" : score >= 3 ? "medium" : "light";
-    const fillBoost = level === "strong" ? 0.35 : level === "medium" ? 0.2 : 0.1;
-    const auraAlpha = level === "strong" ? 0.34 : level === "medium" ? 0.22 : 0.14;
-    const auraRadius = level === "strong" ? 7 : level === "medium" ? 5 : 3;
+    const fillBoost = hasCurrentHit
+        ? (level === "strong" ? 0.35 : level === "medium" ? 0.2 : 0.1)
+        : 0;
+    const auraAlpha = hasCurrentHit
+        ? (level === "strong" ? 0.34 : level === "medium" ? 0.22 : 0.14)
+        : 0;
+    const auraRadius = hasCurrentHit
+        ? (level === "strong" ? 7 : level === "medium" ? 5 : 3)
+        : 0;
     const sessionAuraWidth = Math.min(5, sessionHitCount);
-    const hasSessionHeat = sessionHitCount > 1;
     return {
+        hasCurrentHit,
         level,
-        fillColor: mixWithWhite(node.color, fillBoost),
-        auraColor: rgba(node.color, auraAlpha),
+        fillColor: hasCurrentHit ? mixWithWhite(node.color, fillBoost) : node.color,
+        auraColor: hasCurrentHit ? rgba(node.color, auraAlpha) : null,
         auraRadius,
-        ringWidth: askHit?.isSeed ? 2.5 : 1.5,
+        ringWidth: hasCurrentHit ? (askHit?.isSeed ? 2.5 : 1.5) : 0,
         hasSessionHeat,
         sessionHitCount,
         sessionRingWidth: hasSessionHeat ? 1 + sessionAuraWidth * 0.35 : 0,
-        sessionRingRadius: hasSessionHeat ? auraRadius + 4 + sessionAuraWidth : 0,
-        sessionRingColor: hasSessionHeat ? rgba("#f8fafc", 0.18 + Math.min(0.25, sessionHitCount * 0.04)) : null,
+        sessionRingRadius: hasSessionHeat
+            ? Math.max(auraRadius, 2) + 4 + sessionAuraWidth
+            : 0,
+        sessionRingColor: hasSessionHeat
+            ? rgba("#f8fafc", 0.18 + Math.min(0.25, sessionHitCount * 0.04))
+            : null,
     };
 }
 
@@ -254,10 +266,12 @@ export function draw(state: CoreState, ctx: CanvasRenderingContext2D | null) {
         const radius = getNodeRadius(n);
         const hitVisuals = n.type === "chapter" ? getAskHitVisuals(n) : null;
         if (hitVisuals) {
-            ctx.beginPath();
-            ctx.arc(n.x, n.y, radius + hitVisuals.auraRadius, 0, Math.PI * 2);
-            ctx.fillStyle = hitVisuals.auraColor;
-            ctx.fill();
+            if (hitVisuals.auraColor && hitVisuals.auraRadius > 0) {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, radius + hitVisuals.auraRadius, 0, Math.PI * 2);
+                ctx.fillStyle = hitVisuals.auraColor;
+                ctx.fill();
+            }
             if (hitVisuals.hasSessionHeat && hitVisuals.sessionRingColor) {
                 ctx.beginPath();
                 ctx.arc(n.x, n.y, radius + hitVisuals.sessionRingRadius, 0, Math.PI * 2);
@@ -270,7 +284,7 @@ export function draw(state: CoreState, ctx: CanvasRenderingContext2D | null) {
         ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
         ctx.fillStyle = hitVisuals?.fillColor ?? n.color;
         ctx.fill();
-        if (hitVisuals) {
+        if (hitVisuals?.hasCurrentHit) {
             ctx.beginPath();
             ctx.arc(n.x, n.y, radius + 1.2, 0, Math.PI * 2);
             ctx.strokeStyle = hitVisuals.level === "strong" ? "#f8fafc" : rgba(n.color, 0.9);

@@ -206,3 +206,38 @@ test("current-hit replacement preserves accumulated session heat for same run", 
     assert.equal(mergedSecondMap["book::ch1"].lastHitAt, 2000);
     assert.equal(mergedSecondMap["book::ch2"].sessionHitCount, 1);
 });
+
+test("session-only chapters remain in merged render payload after a later ask", () => {
+    const firstHitMap = {
+        "book::ch1": {
+            chapterId: "book::ch1",
+            currentHitScore: 4,
+            queryType: "term",
+            queryLabel: "Spring",
+        },
+        "book::ch2": {
+            chapterId: "book::ch2",
+            currentHitScore: 2,
+            queryType: "term",
+            queryLabel: "Spring",
+        },
+    };
+    const secondHitMap = {
+        "book::ch2": {
+            chapterId: "book::ch2",
+            currentHitScore: 3,
+            queryType: "term",
+            queryLabel: "JdbcTemplate",
+        },
+    };
+
+    const firstHistory = updateSessionHitHistory({}, firstHitMap, 1000);
+    const secondHistory = updateSessionHitHistory(firstHistory, secondHitMap, 2000);
+    const mergedSecondMap = mergeAskHitWithSessionHistory(secondHitMap, secondHistory);
+
+    assert.equal(mergedSecondMap["book::ch1"].currentHitScore, 0);
+    assert.equal(mergedSecondMap["book::ch1"].sessionHitCount, 1);
+    assert.equal(mergedSecondMap["book::ch1"].queryLabel, null);
+    assert.equal(mergedSecondMap["book::ch2"].currentHitScore, 3);
+    assert.equal(mergedSecondMap["book::ch2"].sessionHitCount, 2);
+});
