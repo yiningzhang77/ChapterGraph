@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from feature_achievement.api.main import app
 from feature_achievement.api.routers import ask as ask_router
+from feature_achievement.ask.tool_contracts import ChapterFlowResult, TermFlowResult
 from feature_achievement.db.engine import get_session
 
 
@@ -33,6 +34,48 @@ def _payload(**overrides: object) -> dict[str, object]:
     }
     body.update(overrides)
     return body
+
+
+def _term_flow_result(
+    *,
+    cluster_payload: dict[str, object],
+    evidence: dict[str, object] | None,
+    retrieval_warnings: dict[str, object] | None = None,
+    response_state: str | None = None,
+    response_guidance: str | None = None,
+    answer_markdown: str | None = None,
+    llm_error: str | None = None,
+) -> TermFlowResult:
+    return TermFlowResult(
+        cluster_payload=cluster_payload,
+        evidence=evidence,
+        retrieval_warnings=retrieval_warnings,
+        response_state=response_state,
+        response_guidance=response_guidance,
+        answer_markdown=answer_markdown,
+        llm_error=llm_error,
+    )
+
+
+def _chapter_flow_result(
+    *,
+    cluster_payload: dict[str, object],
+    evidence: dict[str, object] | None,
+    retrieval_warnings: dict[str, object] | None = None,
+    response_state: str | None = None,
+    response_guidance: str | None = None,
+    answer_markdown: str | None = None,
+    llm_error: str | None = None,
+) -> ChapterFlowResult:
+    return ChapterFlowResult(
+        cluster_payload=cluster_payload,
+        evidence=evidence,
+        retrieval_warnings=retrieval_warnings,
+        response_state=response_state,
+        response_guidance=response_guidance,
+        answer_markdown=answer_markdown,
+        llm_error=llm_error,
+    )
 
 
 def test_ask_api_returns_404_for_missing_run(
@@ -81,9 +124,9 @@ def test_ask_api_term_flow_success_with_llm(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
-        return {
-            "cluster_payload": {
+    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
+        return _term_flow_result(
+            cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "Actuator",
                 "query_type": "term",
@@ -105,7 +148,7 @@ def test_ask_api_term_flow_success_with_llm(
                 "edges": [],
                 "constraints": {},
             },
-            "evidence": {
+            evidence={
                 "sections": [
                     {
                         "chapter_id": "spring::ch1",
@@ -125,16 +168,8 @@ def test_ask_api_term_flow_success_with_llm(
                     }
                 ],
             },
-            "retrieval_warnings": None,
-            "narrowing_payload": {
-                "suggested_terms": None,
-                "suggested_term_diagnostics": None,
-            },
-            "response_state": None,
-            "response_guidance": None,
-            "answer_markdown": "answer ok",
-            "llm_error": None,
-        }
+            answer_markdown="answer ok",
+        )
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
 
@@ -162,7 +197,7 @@ def test_ask_api_chapter_flow_success(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_chapter_flow(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_chapter_flow(*args: object, **kwargs: object) -> ChapterFlowResult:
         req = kwargs.get("req")
         assert req is not None
         assert req.query_type == "chapter"
@@ -171,8 +206,8 @@ def test_ask_api_chapter_flow_success(
             req.query
             == 'Summarize the selected chapter "spring::ch2" using the retrieved cluster.'
         )
-        return {
-            "cluster_payload": {
+        return _chapter_flow_result(
+            cluster_payload={
             "schema_version": "cluster.v1",
             "query": "Explain selected chapter",
             "query_type": "chapter",
@@ -194,13 +229,8 @@ def test_ask_api_chapter_flow_success(
             "edges": [],
             "constraints": {},
             },
-            "evidence": {"sections": [], "bullets": []},
-            "retrieval_warnings": None,
-            "response_state": None,
-            "response_guidance": None,
-            "answer_markdown": None,
-            "llm_error": None,
-        }
+            evidence={"sections": [], "bullets": []},
+        )
 
     monkeypatch.setattr(ask_router, "run_chapter_flow", fake_run_chapter_flow)
 
@@ -226,9 +256,9 @@ def test_ask_api_records_llm_error_in_meta(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
-        return {
-            "cluster_payload": {
+    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
+        return _term_flow_result(
+            cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "Actuator",
                 "query_type": "term",
@@ -242,17 +272,9 @@ def test_ask_api_records_llm_error_in_meta(
                 "edges": [],
                 "constraints": {},
             },
-            "evidence": {"sections": [], "bullets": []},
-            "retrieval_warnings": None,
-            "narrowing_payload": {
-                "suggested_terms": None,
-                "suggested_term_diagnostics": None,
-            },
-            "response_state": None,
-            "response_guidance": None,
-            "answer_markdown": None,
-            "llm_error": "llm failure",
-        }
+            evidence={"sections": [], "bullets": []},
+            llm_error="llm failure",
+        )
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
 
@@ -268,10 +290,10 @@ def test_ask_api_blocks_broad_precise_term_request(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
         _ = (args, kwargs)
-        return {
-            "cluster_payload": {
+        return _term_flow_result(
+            cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "How does Spring implement data persistence?",
                 "query_type": "term",
@@ -297,7 +319,7 @@ def test_ask_api_blocks_broad_precise_term_request(
                 "edges": [],
                 "constraints": {},
             },
-            "evidence": {
+            evidence={
                 "sections": [],
                 "bullets": [
                     {"chapter_id": "book0::ch1"},
@@ -307,7 +329,7 @@ def test_ask_api_blocks_broad_precise_term_request(
                     {"chapter_id": "book1::ch5"},
                 ],
             },
-            "retrieval_warnings": {
+            retrieval_warnings={
                 "state": "broad_blocked",
                 "term_too_broad": True,
                 "evidence_too_scattered": True,
@@ -327,28 +349,8 @@ def test_ask_api_blocks_broad_precise_term_request(
                 "recommendation_source": "rule_based",
                 "recommendation_confidence": "heuristic",
             },
-            "narrowing_payload": {
-                "suggested_terms": [
-                    "data persistence",
-                    "JdbcTemplate",
-                    "Spring Data JPA",
-                    "Spring Data",
-                ],
-                "suggested_term_diagnostics": [
-                    {"term": "data persistence"},
-                    {"term": "JdbcTemplate"},
-                    {"term": "Spring Data JPA"},
-                    {"term": "Spring Data"},
-                ],
-                "recommendation_reason": "spring_persistence",
-                "recommendation_source": "rule_based",
-                "recommendation_confidence": "heuristic",
-            },
-            "response_state": "needs_narrower_term",
-            "response_guidance": None,
-            "answer_markdown": None,
-            "llm_error": None,
-        }
+            response_state="needs_narrower_term",
+        )
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
 
@@ -389,9 +391,9 @@ def test_ask_api_allows_broad_definition_term_request(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
-        return {
-            "cluster_payload": {
+    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
+        return _term_flow_result(
+            cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "What is Spring?",
                 "query_type": "term",
@@ -417,7 +419,7 @@ def test_ask_api_allows_broad_definition_term_request(
                 "edges": [],
                 "constraints": {},
             },
-            "evidence": {
+            evidence={
                 "sections": [],
                 "bullets": [
                     {"chapter_id": "book0::ch1"},
@@ -427,7 +429,7 @@ def test_ask_api_allows_broad_definition_term_request(
                     {"chapter_id": "book1::ch5"},
                 ],
             },
-            "retrieval_warnings": {
+            retrieval_warnings={
                 "state": "broad_allowed",
                 "term_too_broad": True,
                 "evidence_too_scattered": True,
@@ -441,26 +443,13 @@ def test_ask_api_allows_broad_definition_term_request(
                 "recommendation_source": "rule_based",
                 "recommendation_confidence": "heuristic",
             },
-            "narrowing_payload": {
-                "suggested_terms": [
-                    "Actuator",
-                    "JdbcTemplate",
-                    "data persistence",
-                    "Spring Security",
-                ],
-                "suggested_term_diagnostics": None,
-                "recommendation_reason": "spring_fallback",
-                "recommendation_source": "rule_based",
-                "recommendation_confidence": "heuristic",
-            },
-            "response_state": "broad_overview",
-            "response_guidance": (
+            response_state="broad_overview",
+            response_guidance=(
                 "Warning: retrieval is broad. Give only a concise "
                 "high-level concept explanation."
             ),
-            "answer_markdown": "broad overview answer",
-            "llm_error": None,
-        }
+            answer_markdown="broad overview answer",
+        )
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
 
@@ -495,9 +484,9 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
-        return {
-            "cluster_payload": {
+    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
+        return _term_flow_result(
+            cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "How does Spring implement data persistence?",
                 "query_type": "term",
@@ -523,7 +512,7 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
                 "edges": [],
                 "constraints": {},
             },
-            "evidence": {
+            evidence={
                 "sections": [],
                 "bullets": [
                     {"chapter_id": "book0::ch1"},
@@ -533,7 +522,7 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
                     {"chapter_id": "book1::ch5"},
                 ],
             },
-            "retrieval_warnings": {
+            retrieval_warnings={
                 "state": "broad_blocked",
                 "term_too_broad": True,
                 "evidence_too_scattered": True,
@@ -547,23 +536,8 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
                 "recommendation_source": "rule_based",
                 "recommendation_confidence": "heuristic",
             },
-            "narrowing_payload": {
-                "suggested_terms": [
-                    "Spring Data",
-                    "data persistence",
-                    "JdbcTemplate",
-                    "Spring Data JPA",
-                ],
-                "suggested_term_diagnostics": None,
-                "recommendation_reason": "spring_persistence",
-                "recommendation_source": "rule_based",
-                "recommendation_confidence": "heuristic",
-            },
-            "response_state": "needs_narrower_term",
-            "response_guidance": None,
-            "answer_markdown": None,
-            "llm_error": None,
-        }
+            response_state="needs_narrower_term",
+        )
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
 
@@ -591,11 +565,11 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
         req = kwargs.get("req")
         if getattr(req, "term", None) == "Spring":
-            return {
-                "cluster_payload": {
+            return _term_flow_result(
+                cluster_payload={
                     "schema_version": "cluster.v1",
                     "query": "How does Spring implement data persistence?",
                     "query_type": "term",
@@ -621,7 +595,7 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                     "edges": [],
                     "constraints": {},
                 },
-                "evidence": {
+                evidence={
                     "sections": [],
                     "bullets": [
                         {"chapter_id": "book0::ch1"},
@@ -631,7 +605,7 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                         {"chapter_id": "book1::ch5"},
                     ],
                 },
-                "retrieval_warnings": {
+                retrieval_warnings={
                     "state": "broad_blocked",
                     "term_too_broad": True,
                     "evidence_too_scattered": True,
@@ -645,26 +619,11 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                     "recommendation_source": "rule_based",
                     "recommendation_confidence": "heuristic",
                 },
-                "narrowing_payload": {
-                    "suggested_terms": [
-                        "Spring Data",
-                        "data persistence",
-                        "JdbcTemplate",
-                        "Spring Data JPA",
-                    ],
-                    "suggested_term_diagnostics": None,
-                    "recommendation_reason": "spring_persistence",
-                    "recommendation_source": "rule_based",
-                    "recommendation_confidence": "heuristic",
-                },
-                "response_state": "needs_narrower_term",
-                "response_guidance": None,
-                "answer_markdown": None,
-                "llm_error": None,
-            }
+                response_state="needs_narrower_term",
+            )
 
-        return {
-            "cluster_payload": {
+        return _term_flow_result(
+            cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "How does Spring implement data persistence?",
                 "query_type": "term",
@@ -681,23 +640,14 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                 "edges": [],
                 "constraints": {},
             },
-            "evidence": {
+            evidence={
                 "sections": [],
                 "bullets": [
                     {"chapter_id": "book1::ch2"},
                     {"chapter_id": "book1::ch5"},
                 ],
             },
-            "retrieval_warnings": None,
-            "narrowing_payload": {
-                "suggested_terms": None,
-                "suggested_term_diagnostics": None,
-            },
-            "response_state": None,
-            "response_guidance": None,
-            "answer_markdown": None,
-            "llm_error": None,
-        }
+        )
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
 
@@ -755,12 +705,12 @@ def test_ask_api_chapter_flow_success_with_explicit_query(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_chapter_flow(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_chapter_flow(*args: object, **kwargs: object) -> ChapterFlowResult:
         req = kwargs.get("req")
         assert req is not None
         assert req.query == "Explain selected chapter"
-        return {
-            "cluster_payload": {
+        return _chapter_flow_result(
+            cluster_payload={
             "schema_version": "cluster.v1",
             "query": "Explain selected chapter",
             "query_type": "chapter",
@@ -774,13 +724,8 @@ def test_ask_api_chapter_flow_success_with_explicit_query(
             "edges": [],
             "constraints": {},
             },
-            "evidence": {"sections": [], "bullets": []},
-            "retrieval_warnings": None,
-            "response_state": None,
-            "response_guidance": None,
-            "answer_markdown": None,
-            "llm_error": None,
-        }
+            evidence={"sections": [], "bullets": []},
+        )
 
     monkeypatch.setattr(ask_router, "run_chapter_flow", fake_run_chapter_flow)
 

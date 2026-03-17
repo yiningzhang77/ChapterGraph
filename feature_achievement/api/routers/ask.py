@@ -4,34 +4,10 @@ from sqlmodel import Session
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
 from feature_achievement.ask.chapter_flow import run_chapter_flow
 from feature_achievement.ask.term_flow import run_term_flow
+from feature_achievement.ask.tool_contracts import ChapterFlowResult, TermFlowResult
 from feature_achievement.db.engine import get_session
 
 router = APIRouter(prefix="", tags=["ask"])
-
-
-def _coerce_term_flow_result(result: dict[str, object]) -> dict[str, object]:
-    cluster_payload = result.get("cluster_payload")
-    return {
-        "cluster_payload": cluster_payload if isinstance(cluster_payload, dict) else {},
-        "evidence": result.get("evidence")
-        if isinstance(result.get("evidence"), dict)
-        else None,
-        "retrieval_warnings": result.get("retrieval_warnings")
-        if isinstance(result.get("retrieval_warnings"), dict)
-        else None,
-        "response_state": result.get("response_state")
-        if isinstance(result.get("response_state"), str)
-        else None,
-        "response_guidance": result.get("response_guidance")
-        if isinstance(result.get("response_guidance"), str)
-        else None,
-        "answer_markdown": result.get("answer_markdown")
-        if isinstance(result.get("answer_markdown"), str)
-        else None,
-        "llm_error": result.get("llm_error")
-        if isinstance(result.get("llm_error"), str)
-        else None,
-    }
 
 
 def _build_graph_fragment(cluster_payload: dict[str, object]) -> dict[str, object]:
@@ -84,16 +60,16 @@ def _run_term_request(
     *,
     req: AskRequest,
     session: Session,
-) -> dict[str, object]:
-    return _coerce_term_flow_result(run_term_flow(req=req, session=session))
+) -> TermFlowResult:
+    return run_term_flow(req=req, session=session)
 
 
 def _run_chapter_request(
     *,
     req: AskRequest,
     session: Session,
-) -> dict[str, object]:
-    return _coerce_term_flow_result(run_chapter_flow(req=req, session=session))
+) -> ChapterFlowResult:
+    return run_chapter_flow(req=req, session=session)
 
 
 @router.post("/ask", response_model=AskResponse)
@@ -106,12 +82,12 @@ def ask(
     else:
         request_result = _run_chapter_request(req=req, session=session)
 
-    cluster_payload = request_result["cluster_payload"]
-    evidence = request_result["evidence"]
-    retrieval_warnings = request_result["retrieval_warnings"]
-    response_state = request_result["response_state"]
-    answer_markdown = request_result["answer_markdown"]
-    llm_error = request_result["llm_error"]
+    cluster_payload = request_result.cluster_payload
+    evidence = request_result.evidence
+    retrieval_warnings = request_result.retrieval_warnings
+    response_state = request_result.response_state
+    answer_markdown = request_result.answer_markdown
+    llm_error = request_result.llm_error
 
     graph_fragment = (
         _build_graph_fragment(cluster_payload) if req.return_graph_fragment else None

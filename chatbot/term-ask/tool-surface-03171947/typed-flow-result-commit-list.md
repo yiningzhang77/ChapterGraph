@@ -75,7 +75,7 @@ Update [chapter_flow.py](C:/Users/hy/ChapterGraph/feature_achievement/ask/chapte
 
 `refactor(api): consume typed flow results in ask router`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
