@@ -98,6 +98,7 @@ export function buildAskHitMap(result, context = {}) {
 function createInitialState() {
     return {
         graph: null,
+        askHitMap: {},
         expandedBooks: new Set(),
         nodes: [],
         links: [],
@@ -120,7 +121,6 @@ function App() {
     const [askError, setAskError] = useState("");
     const [askLoading, setAskLoading] = useState(false);
     const [selectedChapter, setSelectedChapter] = useState(null);
-    const [askHitMap, setAskHitMap] = useState({});
     const [state, dispatch] = useReducer(
         (currentState, action) => {
             const partial = coreReducer(currentState, action);
@@ -146,7 +146,7 @@ function App() {
     useEffect(() => {
         if (!state.graph) return;
         rebuildGraph(state, simulationRef);
-    }, [state.graph, state.expandedBooks, state.dimensions]);
+    }, [state.graph, state.expandedBooks, state.askHitMap, state.dimensions]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -425,12 +425,15 @@ function App() {
             const result = askMode === "chapter"
                 ? await askByChapter(query, selectedChapter.chapterId)
                 : await askByTerm(term, query);
-            setAskHitMap(buildAskHitMap(result, {
-                queryType: askMode,
-                queryLabel: askMode === "term"
-                    ? term
-                    : selectedChapter?.chapterId ?? null,
-            }));
+            dispatch({
+                type: "SET_ASK_HIT_MAP",
+                askHitMap: buildAskHitMap(result, {
+                    queryType: askMode,
+                    queryLabel: askMode === "term"
+                        ? term
+                        : selectedChapter?.chapterId ?? null,
+                }),
+            });
             const meta = result && typeof result === "object" && result.meta && typeof result.meta === "object"
                 ? result.meta
                 : {};

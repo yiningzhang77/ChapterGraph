@@ -64,7 +64,7 @@ Suggested deterministic scoring:
 
 ### `feat(frontend): feed ask hit map into graph node rendering`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
