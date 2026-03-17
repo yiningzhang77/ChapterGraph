@@ -39,10 +39,10 @@ def test_ask_api_returns_404_for_missing_run(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     response = client.post("/ask", json=_payload())
 
     assert response.status_code == 404
@@ -53,10 +53,10 @@ def test_ask_api_returns_409_for_version_mismatch(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         raise HTTPException(status_code=409, detail="version mismatch")
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     response = client.post("/ask", json=_payload())
 
     assert response.status_code == 409
@@ -67,10 +67,10 @@ def test_ask_api_returns_422_when_no_seed_found(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         raise HTTPException(status_code=422, detail="No seed chapters found")
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     response = client.post("/ask", json=_payload())
 
     assert response.status_code == 422
@@ -83,24 +83,30 @@ def test_ask_api_term_flow_success_with_llm(
 ) -> None:
     captured: dict[str, object] = {}
 
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         return {
-            "schema_version": "cluster.v1",
-            "query": "Actuator",
-            "query_type": "term",
-            "run_id": 7,
-            "enrichment_version": "v2_indexed_sections_bullets",
-            "seed": {"seed_chapter_ids": ["spring::ch1"], "seed_reason": "term_ilike"},
-            "chapters": [
-                {
-                    "chapter_id": "spring::ch1",
-                    "book_id": "spring",
-                    "title": "Actuator",
-                    "chapter_text": "text",
-                    "chapter_index_text": "index",
-                }
-            ],
-            "edges": [],
+            "cluster_payload": {
+                "schema_version": "cluster.v1",
+                "query": "Actuator",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": ["spring::ch1"],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [
+                    {
+                        "chapter_id": "spring::ch1",
+                        "book_id": "spring",
+                        "title": "Actuator",
+                        "chapter_text": "text",
+                        "chapter_index_text": "index",
+                    }
+                ],
+                "edges": [],
+                "constraints": {},
+            },
             "evidence": {
                 "sections": [
                     {
@@ -121,7 +127,15 @@ def test_ask_api_term_flow_success_with_llm(
                     }
                 ],
             },
-            "constraints": {},
+            "retrieval_warnings": None,
+            "narrowing_payload": {
+                "suggested_terms": None,
+                "suggested_term_diagnostics": None,
+            },
+            "response_state": None,
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
         }
 
     def fake_ask_qwen(
@@ -142,7 +156,7 @@ def test_ask_api_term_flow_success_with_llm(
         captured["timeout_ms"] = timeout_ms
         return "answer ok"
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     monkeypatch.setattr(ask_router, "ask_qwen", fake_ask_qwen)
 
     response = client.post(
@@ -235,24 +249,38 @@ def test_ask_api_records_llm_error_in_meta(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         return {
-            "schema_version": "cluster.v1",
-            "query": "Actuator",
-            "query_type": "term",
-            "run_id": 7,
-            "enrichment_version": "v2_indexed_sections_bullets",
-            "seed": {"seed_chapter_ids": ["spring::ch1"], "seed_reason": "term_ilike"},
-            "chapters": [],
-            "edges": [],
+            "cluster_payload": {
+                "schema_version": "cluster.v1",
+                "query": "Actuator",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": ["spring::ch1"],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [],
+                "edges": [],
+                "constraints": {},
+            },
             "evidence": {"sections": [], "bullets": []},
-            "constraints": {},
+            "retrieval_warnings": None,
+            "narrowing_payload": {
+                "suggested_terms": None,
+                "suggested_term_diagnostics": None,
+            },
+            "response_state": None,
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
         }
 
     def fake_ask_qwen(*args: object, **kwargs: object) -> str:
         raise RuntimeError("llm failure")
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     monkeypatch.setattr(ask_router, "ask_qwen", fake_ask_qwen)
 
     response = client.post("/ask", json=_payload(llm_enabled=True))
@@ -267,31 +295,34 @@ def test_ask_api_blocks_broad_precise_term_request(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         return {
-            "schema_version": "cluster.v1",
-            "query": "How does Spring implement data persistence?",
-            "query_type": "term",
-            "run_id": 7,
-            "enrichment_version": "v2_indexed_sections_bullets",
-            "seed": {
-                "seed_chapter_ids": [
-                    "book0::ch1",
-                    "book1::ch2",
-                    "book2::ch3",
-                    "book0::ch4",
-                    "book1::ch5",
+            "cluster_payload": {
+                "schema_version": "cluster.v1",
+                "query": "How does Spring implement data persistence?",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": [
+                        "book0::ch1",
+                        "book1::ch2",
+                        "book2::ch3",
+                        "book0::ch4",
+                        "book1::ch5",
+                    ],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [
+                    {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                    {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                    {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                    {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                    {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
                 ],
-                "seed_reason": "term_ilike",
+                "edges": [],
+                "constraints": {},
             },
-            "chapters": [
-                {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
-                {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
-                {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
-                {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
-                {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
-            ],
-            "edges": [],
             "evidence": {
                 "sections": [],
                 "bullets": [
@@ -302,7 +333,19 @@ def test_ask_api_blocks_broad_precise_term_request(
                     {"chapter_id": "book1::ch5"},
                 ],
             },
-            "constraints": {},
+            "retrieval_warnings": {
+                "state": "broad_blocked",
+                "term_too_broad": True,
+                "evidence_too_scattered": True,
+            },
+            "narrowing_payload": {
+                "suggested_terms": None,
+                "suggested_term_diagnostics": None,
+            },
+            "response_state": "needs_narrower_term",
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
         }
 
     def fake_ask_qwen(*args: object, **kwargs: object) -> str:
@@ -317,7 +360,7 @@ def test_ask_api_blocks_broad_precise_term_request(
             {"term": "Spring Data"},
         ]
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     monkeypatch.setattr(ask_router, "ask_qwen", fake_ask_qwen)
     monkeypatch.setattr(ask_router, "rank_candidate_anchors", fake_rank_candidate_anchors)
 
@@ -360,31 +403,34 @@ def test_ask_api_allows_broad_definition_term_request(
 ) -> None:
     captured: dict[str, object] = {}
 
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         return {
-            "schema_version": "cluster.v1",
-            "query": "What is Spring?",
-            "query_type": "term",
-            "run_id": 7,
-            "enrichment_version": "v2_indexed_sections_bullets",
-            "seed": {
-                "seed_chapter_ids": [
-                    "book0::ch1",
-                    "book1::ch2",
-                    "book2::ch3",
-                    "book0::ch4",
-                    "book1::ch5",
+            "cluster_payload": {
+                "schema_version": "cluster.v1",
+                "query": "What is Spring?",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": [
+                        "book0::ch1",
+                        "book1::ch2",
+                        "book2::ch3",
+                        "book0::ch4",
+                        "book1::ch5",
+                    ],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [
+                    {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                    {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                    {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                    {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                    {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
                 ],
-                "seed_reason": "term_ilike",
+                "edges": [],
+                "constraints": {},
             },
-            "chapters": [
-                {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
-                {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
-                {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
-                {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
-                {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
-            ],
-            "edges": [],
             "evidence": {
                 "sections": [],
                 "bullets": [
@@ -395,7 +441,19 @@ def test_ask_api_allows_broad_definition_term_request(
                     {"chapter_id": "book1::ch5"},
                 ],
             },
-            "constraints": {},
+            "retrieval_warnings": {
+                "state": "broad_allowed",
+                "term_too_broad": True,
+                "evidence_too_scattered": True,
+            },
+            "narrowing_payload": {
+                "suggested_terms": None,
+                "suggested_term_diagnostics": None,
+            },
+            "response_state": "broad_overview",
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
         }
 
     def fake_ask_qwen(
@@ -413,7 +471,7 @@ def test_ask_api_allows_broad_definition_term_request(
         _ = (query_type, cluster, model, timeout_ms)
         return "broad overview answer"
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     monkeypatch.setattr(ask_router, "ask_qwen", fake_ask_qwen)
 
     response = client.post(
@@ -450,31 +508,34 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         return {
-            "schema_version": "cluster.v1",
-            "query": "How does Spring implement data persistence?",
-            "query_type": "term",
-            "run_id": 7,
-            "enrichment_version": "v2_indexed_sections_bullets",
-            "seed": {
-                "seed_chapter_ids": [
-                    "book0::ch1",
-                    "book1::ch2",
-                    "book2::ch3",
-                    "book0::ch4",
-                    "book1::ch5",
+            "cluster_payload": {
+                "schema_version": "cluster.v1",
+                "query": "How does Spring implement data persistence?",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": [
+                        "book0::ch1",
+                        "book1::ch2",
+                        "book2::ch3",
+                        "book0::ch4",
+                        "book1::ch5",
+                    ],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [
+                    {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                    {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                    {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                    {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                    {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
                 ],
-                "seed_reason": "term_ilike",
+                "edges": [],
+                "constraints": {},
             },
-            "chapters": [
-                {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
-                {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
-                {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
-                {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
-                {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
-            ],
-            "edges": [],
             "evidence": {
                 "sections": [],
                 "bullets": [
@@ -485,14 +546,26 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
                     {"chapter_id": "book1::ch5"},
                 ],
             },
-            "constraints": {},
+            "retrieval_warnings": {
+                "state": "broad_blocked",
+                "term_too_broad": True,
+                "evidence_too_scattered": True,
+            },
+            "narrowing_payload": {
+                "suggested_terms": None,
+                "suggested_term_diagnostics": None,
+            },
+            "response_state": "needs_narrower_term",
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
         }
 
     def fake_rank_candidate_anchors(**kwargs: object) -> list[dict[str, object]]:
         _ = kwargs
         raise RuntimeError("probe failed")
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
     monkeypatch.setattr(ask_router, "rank_candidate_anchors", fake_rank_candidate_anchors)
 
     response = client.post(
@@ -519,33 +592,36 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_build_cluster(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
         req = kwargs.get("req")
         if getattr(req, "term", None) == "Spring":
             return {
-                "schema_version": "cluster.v1",
-                "query": "How does Spring implement data persistence?",
-                "query_type": "term",
-                "run_id": 7,
-                "enrichment_version": "v2_indexed_sections_bullets",
-                "seed": {
-                    "seed_chapter_ids": [
-                        "book0::ch1",
-                        "book1::ch2",
-                        "book2::ch3",
-                        "book0::ch4",
-                        "book1::ch5",
+                "cluster_payload": {
+                    "schema_version": "cluster.v1",
+                    "query": "How does Spring implement data persistence?",
+                    "query_type": "term",
+                    "run_id": 7,
+                    "enrichment_version": "v2_indexed_sections_bullets",
+                    "seed": {
+                        "seed_chapter_ids": [
+                            "book0::ch1",
+                            "book1::ch2",
+                            "book2::ch3",
+                            "book0::ch4",
+                            "book1::ch5",
+                        ],
+                        "seed_reason": "term_ilike",
+                    },
+                    "chapters": [
+                        {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
+                        {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                        {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
+                        {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
+                        {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
                     ],
-                    "seed_reason": "term_ilike",
+                    "edges": [],
+                    "constraints": {},
                 },
-                "chapters": [
-                    {"chapter_id": "book0::ch1", "book_id": "book0", "title": "A"},
-                    {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
-                    {"chapter_id": "book2::ch3", "book_id": "book2", "title": "C"},
-                    {"chapter_id": "book0::ch4", "book_id": "book0", "title": "D"},
-                    {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
-                ],
-                "edges": [],
                 "evidence": {
                     "sections": [],
                     "bullets": [
@@ -556,24 +632,39 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                         {"chapter_id": "book1::ch5"},
                     ],
                 },
-                "constraints": {},
+                "retrieval_warnings": {
+                    "state": "broad_blocked",
+                    "term_too_broad": True,
+                    "evidence_too_scattered": True,
+                },
+                "narrowing_payload": {
+                    "suggested_terms": None,
+                    "suggested_term_diagnostics": None,
+                },
+                "response_state": "needs_narrower_term",
+                "response_guidance": None,
+                "answer_markdown": None,
+                "llm_error": None,
             }
 
         return {
-            "schema_version": "cluster.v1",
-            "query": "How does Spring implement data persistence?",
-            "query_type": "term",
-            "run_id": 7,
-            "enrichment_version": "v2_indexed_sections_bullets",
-            "seed": {
-                "seed_chapter_ids": ["book1::ch2", "book1::ch5"],
-                "seed_reason": "term_ilike",
+            "cluster_payload": {
+                "schema_version": "cluster.v1",
+                "query": "How does Spring implement data persistence?",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": ["book1::ch2", "book1::ch5"],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [
+                    {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
+                    {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
+                ],
+                "edges": [],
+                "constraints": {},
             },
-            "chapters": [
-                {"chapter_id": "book1::ch2", "book_id": "book1", "title": "B"},
-                {"chapter_id": "book1::ch5", "book_id": "book1", "title": "E"},
-            ],
-            "edges": [],
             "evidence": {
                 "sections": [],
                 "bullets": [
@@ -581,10 +672,18 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                     {"chapter_id": "book1::ch5"},
                 ],
             },
-            "constraints": {},
+            "retrieval_warnings": None,
+            "narrowing_payload": {
+                "suggested_terms": None,
+                "suggested_term_diagnostics": None,
+            },
+            "response_state": None,
+            "response_guidance": None,
+            "answer_markdown": None,
+            "llm_error": None,
         }
 
-    monkeypatch.setattr(ask_router, "build_cluster", fake_build_cluster)
+    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
 
     blocked_response = client.post(
         "/ask",

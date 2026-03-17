@@ -59,7 +59,7 @@ def _generate_term_answer(...)
 
 ### `refactor(ask): move cluster and retrieval-quality orchestration into term_flow`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

@@ -59,3 +59,75 @@ def test_run_term_flow_returns_service_shape(monkeypatch) -> None:
         "answer_markdown": "answer",
         "llm_error": None,
     }
+
+
+def test_build_term_cluster_splits_cluster_payload_and_evidence(
+    monkeypatch,
+) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Actuator",
+        user_query="Tell me about Actuator",
+        run_id=5,
+        llm_enabled=False,
+    )
+
+    monkeypatch.setattr(
+        term_flow,
+        "build_cluster",
+        lambda **kwargs: {
+            "schema_version": "cluster.v1",
+            "chapters": [{"chapter_id": "spring::ch1"}],
+            "edges": [],
+            "evidence": {"bullets": [{"chapter_id": "spring::ch1"}]},
+        },
+    )
+
+    result = term_flow._build_term_cluster(
+        req=req,
+        session=cast(Session, object()),
+    )
+
+    assert result == {
+        "cluster_payload": {
+            "schema_version": "cluster.v1",
+            "chapters": [{"chapter_id": "spring::ch1"}],
+            "edges": [],
+        },
+        "evidence": {"bullets": [{"chapter_id": "spring::ch1"}]},
+    }
+
+
+def test_evaluate_term_quality_maps_blocked_state(monkeypatch) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Spring",
+        user_query="How does Spring implement data persistence?",
+        run_id=5,
+        llm_enabled=False,
+    )
+
+    monkeypatch.setattr(
+        term_flow,
+        "evaluate_term_retrieval_quality",
+        lambda **kwargs: {
+            "state": "broad_blocked",
+            "term_too_broad": True,
+        },
+    )
+
+    result = term_flow._evaluate_term_quality(
+        req=req,
+        cluster_result={
+            "cluster_payload": {"seed": {"seed_chapter_ids": ["a", "b", "c", "d", "e"]}},
+            "evidence": {"bullets": []},
+        },
+    )
+
+    assert result == {
+        "retrieval_warnings": {
+            "state": "broad_blocked",
+            "term_too_broad": True,
+        },
+        "response_state": "needs_narrower_term",
+    }

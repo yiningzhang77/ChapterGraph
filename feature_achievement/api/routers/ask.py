@@ -6,9 +6,8 @@ from feature_achievement.ask.candidate_anchor import rank_candidate_anchors
 from feature_achievement.ask.cluster_builder import build_cluster
 from feature_achievement.ask.retrieval_quality import (
     broad_overview_prompt_note,
-    default_term_user_query,
-    evaluate_term_retrieval_quality,
 )
+from feature_achievement.ask.term_flow import run_term_flow
 from feature_achievement.ask.term_recommender import recommend_narrower_terms
 from feature_achievement.db.engine import get_session
 from feature_achievement.llm.qwen_client import ask_qwen
@@ -21,26 +20,40 @@ def ask(
     req: AskRequest,
     session: Session = Depends(get_session),
 ):
-    cluster = build_cluster(session=session, req=req)
-    evidence = cluster.get("evidence") if isinstance(cluster.get("evidence"), dict) else None
-    cluster_payload = dict(cluster)
-    cluster_payload.pop("evidence", None)
+    if req.query_type == "term":
+        term_flow_result = run_term_flow(req=req, session=session)
+        cluster_payload = term_flow_result.get("cluster_payload")
+        if not isinstance(cluster_payload, dict):
+            cluster_payload = {}
+        evidence = (
+            term_flow_result.get("evidence")
+            if isinstance(term_flow_result.get("evidence"), dict)
+            else None
+        )
+        retrieval_warnings = (
+            term_flow_result.get("retrieval_warnings")
+            if isinstance(term_flow_result.get("retrieval_warnings"), dict)
+            else None
+        )
+        response_state = (
+            term_flow_result.get("response_state")
+            if isinstance(term_flow_result.get("response_state"), str)
+            else None
+        )
+    else:
+        cluster = build_cluster(session=session, req=req)
+        evidence = cluster.get("evidence") if isinstance(cluster.get("evidence"), dict) else None
+        cluster_payload = dict(cluster)
+        cluster_payload.pop("evidence", None)
+        retrieval_warnings = None
+        response_state = None
+
     answer_markdown: str | None = None
     llm_error: str | None = None
     response_guidance: str | None = None
-    response_state: str | None = None
-
-    retrieval_warnings: dict[str, object] | None = None
     if req.query_type == "term":
         term = req.term or ""
-        user_query = req.user_query or default_term_user_query(term)
-        retrieval_warnings = evaluate_term_retrieval_quality(
-            term=term,
-            user_query=user_query,
-            user_query_was_default=user_query == default_term_user_query(term),
-            cluster=cluster_payload,
-            evidence=evidence,
-        )
+        user_query = req.user_query or req.query or ""
         if isinstance(retrieval_warnings, dict):
             recommendation = recommend_narrower_terms(
                 broad_term=term,
