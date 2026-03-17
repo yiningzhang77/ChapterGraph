@@ -93,7 +93,7 @@ Do not add session heat or persistence.
 
 ### `feat(frontend): add intensity-based node highlight styling`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

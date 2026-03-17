@@ -1,4 +1,52 @@
 const BOOK_COLORS = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6"];
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+function hexToRgb(hex) {
+  const normalized = typeof hex === "string" ? hex.trim().replace("#", "") : "";
+  if (normalized.length !== 6)
+    return null;
+  const red = Number.parseInt(normalized.slice(0, 2), 16);
+  const green = Number.parseInt(normalized.slice(2, 4), 16);
+  const blue = Number.parseInt(normalized.slice(4, 6), 16);
+  if (Number.isNaN(red) || Number.isNaN(green) || Number.isNaN(blue))
+    return null;
+  return { red, green, blue };
+}
+function rgba(hex, alpha) {
+  const rgb = hexToRgb(hex);
+  if (!rgb)
+    return hex;
+  return `rgba(${rgb.red}, ${rgb.green}, ${rgb.blue}, ${clamp(alpha, 0, 1)})`;
+}
+function mixWithWhite(hex, amount) {
+  const rgb = hexToRgb(hex);
+  if (!rgb)
+    return hex;
+  const factor = clamp(amount, 0, 1);
+  const red = Math.round(rgb.red + (255 - rgb.red) * factor);
+  const green = Math.round(rgb.green + (255 - rgb.green) * factor);
+  const blue = Math.round(rgb.blue + (255 - rgb.blue) * factor);
+  return `rgb(${red}, ${green}, ${blue})`;
+}
+function getAskHitVisuals(node) {
+  const askHit = node.askHit;
+  const score = askHit?.currentHitScore ?? 0;
+  if (!score)
+    return null;
+  const level = score >= 5 ? "strong" : score >= 3 ? "medium" : "light";
+  const fillBoost = level === "strong" ? 0.35 : level === "medium" ? 0.2 : 0.1;
+  const auraAlpha = level === "strong" ? 0.34 : level === "medium" ? 0.22 : 0.14;
+  const auraRadius = level === "strong" ? 7 : level === "medium" ? 5 : 3;
+  return {
+    score,
+    level,
+    fillColor: mixWithWhite(node.color, fillBoost),
+    auraColor: rgba(node.color, auraAlpha),
+    auraRadius,
+    ringWidth: askHit?.isSeed ? 2.5 : 1.5
+  };
+}
 function getBookRadius(node) {
   const count = node.chapterCount ?? 1;
   return 12 + Math.sqrt(Math.max(count, 1)) * 2.2;
@@ -156,10 +204,24 @@ function draw(state, ctx) {
     if (n.x == null || n.y == null)
       return;
     const radius = getNodeRadius(n);
+    const hitVisuals = n.type === "chapter" ? getAskHitVisuals(n) : null;
+    if (hitVisuals) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, radius + hitVisuals.auraRadius, 0, Math.PI * 2);
+      ctx.fillStyle = hitVisuals.auraColor;
+      ctx.fill();
+    }
     ctx.beginPath();
     ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);
-    ctx.fillStyle = n.color;
+    ctx.fillStyle = hitVisuals?.fillColor ?? n.color;
     ctx.fill();
+    if (hitVisuals) {
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, radius + 1.2, 0, Math.PI * 2);
+      ctx.strokeStyle = hitVisuals.level === "strong" ? "#f8fafc" : rgba(n.color, 0.9);
+      ctx.lineWidth = hitVisuals.ringWidth;
+      ctx.stroke();
+    }
     if (n.type === "book") {
       ctx.fillStyle = textColor;
       ctx.font = "12px sans-serif";
