@@ -39,6 +39,7 @@ function App() {
     const [askError, setAskError] = useState("");
     const [askLoading, setAskLoading] = useState(false);
     const [selectedChapter, setSelectedChapter] = useState(null);
+    const [sessionHitHistory, setSessionHitHistory] = useState({});
     const [state, dispatch] = useReducer(
         (currentState, action) => {
             const partial = coreReducer(currentState, action);

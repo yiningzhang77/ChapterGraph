@@ -18,7 +18,7 @@ It should survive multiple asks during one page runtime, but it does not need to
 
 ### `feat(frontend): add session hit history state for chapter nodes`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
