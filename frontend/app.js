@@ -179,6 +179,7 @@ function App() {
     useEffect(() => {
         if (!selectedRun) return;
         dispatch({ type: "LOAD_GRAPH_START" });
+        dispatch({ type: "SET_ASK_HIT_MAP", askHitMap: {} });
         setSelectedChapter(null);
         fetch(`${API}/graph?run_id=${selectedRun}`)
             .then((res) => res.json())
@@ -437,6 +438,7 @@ function App() {
         setAskError("");
         setNarrowingHint("");
         setAskLoading(true);
+        dispatch({ type: "SET_ASK_HIT_MAP", askHitMap: {} });
 
         try {
             const result = askMode === "chapter"

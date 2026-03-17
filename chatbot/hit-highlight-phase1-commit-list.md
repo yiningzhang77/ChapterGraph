@@ -168,7 +168,7 @@ Hover should still work for non-highlighted nodes without breaking existing beha
 
 ### `refactor(frontend): reset and rebuild hit highlight state per ask response`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
