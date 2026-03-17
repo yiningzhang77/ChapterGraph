@@ -247,6 +247,23 @@ function App() {
                 } else if (hit.chapterId && hit.chapterId !== hit.label) {
                     tooltip.innerHTML += `<div style="opacity:0.75;">${hit.chapterId}</div>`;
                 }
+                const askHit = hit.askHit && typeof hit.askHit === "object" ? hit.askHit : null;
+                if (askHit && hit.type === "chapter") {
+                    tooltip.innerHTML += `
+                        <div style="margin-top:6px;border-top:1px solid rgba(148,163,184,0.28);padding-top:6px;">
+                            <div style="opacity:0.75;">Current hit score: ${askHit.currentHitScore ?? 0}</div>
+                            <div style="opacity:0.75;">Seed hit: ${askHit.isSeed ? "yes" : "no"}</div>
+                            <div style="opacity:0.75;">Evidence sections: ${askHit.evidenceSectionCount ?? 0}</div>
+                            <div style="opacity:0.75;">Evidence bullets: ${askHit.evidenceBulletCount ?? 0}</div>
+                        </div>
+                    `;
+                    if (typeof askHit.queryType === "string") {
+                        tooltip.innerHTML += `<div style="opacity:0.75;">Query type: ${askHit.queryType}</div>`;
+                    }
+                    if (typeof askHit.queryLabel === "string" && askHit.queryLabel) {
+                        tooltip.innerHTML += `<div style="opacity:0.75;">Query label: ${askHit.queryLabel}</div>`;
+                    }
+                }
             } else {
                 tooltip.style.opacity = "0";
             }

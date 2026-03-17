@@ -131,7 +131,7 @@ Choose the simplest option that fits the current graph renderer.
 
 ### `feat(frontend): show current-hit details on node hover`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
