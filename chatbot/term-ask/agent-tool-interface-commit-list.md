@@ -148,7 +148,7 @@ It only generates answers once orchestration has already decided to answer.
 
 ### `refactor(ask): move term_flow.py onto capability tool interfaces`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
