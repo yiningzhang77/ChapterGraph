@@ -58,6 +58,7 @@ def test_run_chapter_flow_returns_service_shape(monkeypatch) -> None:
         answer_markdown="chapter answer",
         llm_error=None,
     )
+    assert isinstance(result, ChapterFlowResult)
 
 
 def test_generate_chapter_answer_uses_wrapper(monkeypatch) -> None:

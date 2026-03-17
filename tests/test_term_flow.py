@@ -79,6 +79,7 @@ def test_run_term_flow_returns_service_shape(monkeypatch) -> None:
         answer_markdown="answer",
         llm_error=None,
     )
+    assert isinstance(result, TermFlowResult)
 
 
 def test_build_narrowing_payload_reranks_blocked_candidates(monkeypatch) -> None:
