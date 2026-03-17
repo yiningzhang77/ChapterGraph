@@ -221,7 +221,7 @@ This commit is about behavior preservation, not new features.
 
 ### `test(smoke): validate term_flow against current real DB`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
