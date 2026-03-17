@@ -38,16 +38,24 @@ function getAskHitVisuals(node: ViewNode) {
     const askHit = node.askHit;
     const score = askHit?.currentHitScore ?? 0;
     if (!score) return null;
+    const sessionHitCount = askHit?.sessionHitCount ?? 0;
     const level = score >= 5 ? "strong" : score >= 3 ? "medium" : "light";
     const fillBoost = level === "strong" ? 0.35 : level === "medium" ? 0.2 : 0.1;
     const auraAlpha = level === "strong" ? 0.34 : level === "medium" ? 0.22 : 0.14;
     const auraRadius = level === "strong" ? 7 : level === "medium" ? 5 : 3;
+    const sessionAuraWidth = Math.min(5, sessionHitCount);
+    const hasSessionHeat = sessionHitCount > 1;
     return {
         level,
         fillColor: mixWithWhite(node.color, fillBoost),
         auraColor: rgba(node.color, auraAlpha),
         auraRadius,
         ringWidth: askHit?.isSeed ? 2.5 : 1.5,
+        hasSessionHeat,
+        sessionHitCount,
+        sessionRingWidth: hasSessionHeat ? 1 + sessionAuraWidth * 0.35 : 0,
+        sessionRingRadius: hasSessionHeat ? auraRadius + 4 + sessionAuraWidth : 0,
+        sessionRingColor: hasSessionHeat ? rgba("#f8fafc", 0.18 + Math.min(0.25, sessionHitCount * 0.04)) : null,
     };
 }
 
@@ -250,6 +258,13 @@ export function draw(state: CoreState, ctx: CanvasRenderingContext2D | null) {
             ctx.arc(n.x, n.y, radius + hitVisuals.auraRadius, 0, Math.PI * 2);
             ctx.fillStyle = hitVisuals.auraColor;
             ctx.fill();
+            if (hitVisuals.hasSessionHeat && hitVisuals.sessionRingColor) {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, radius + hitVisuals.sessionRingRadius, 0, Math.PI * 2);
+                ctx.strokeStyle = hitVisuals.sessionRingColor;
+                ctx.lineWidth = hitVisuals.sessionRingWidth;
+                ctx.stroke();
+            }
         }
         ctx.beginPath();
         ctx.arc(n.x, n.y, radius, 0, Math.PI * 2);

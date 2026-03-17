@@ -123,7 +123,7 @@ Do not collapse session heat into current score.
 
 ### `feat(frontend): add session heat visual channel on top of current highlight`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
