@@ -17,12 +17,25 @@ export type Graph = {
     edges: GraphEdge[];
 };
 
+export type AskHitInfo = {
+    chapterId: string;
+    bookId: string | null;
+    currentHitScore: number;
+    isSeed: boolean;
+    isClusterNode: boolean;
+    evidenceSectionCount: number;
+    evidenceBulletCount: number;
+    queryType: string | null;
+    queryLabel: string | null;
+};
+
 export type ViewNode = {
     id: string;
     type: "book" | "chapter";
     bookId: string;
     label: string;
     color: string;
+    askHit: AskHitInfo | null;
     chapterId?: string;
     chapterCount?: number;
     x?: number | null;
@@ -52,6 +65,7 @@ export type Dimensions = {
 export type Action =
     | { type: "LOAD_GRAPH_START" }
     | { type: "LOAD_GRAPH_SUCCESS"; graph: Graph }
+    | { type: "SET_ASK_HIT_MAP"; askHitMap: Record<string, AskHitInfo> }
     | { type: "TOGGLE_BOOK"; bookId: string }
     | { type: "SET_HOVERED_NODE"; node: ViewNode | null }
     | { type: "SET_TRANSFORM"; transform: Transform }
@@ -62,6 +76,7 @@ export type Action =
 export interface CoreState {
     uiPhase: UIPhase;
     graph: Graph | null;
+    askHitMap: Record<string, AskHitInfo>;
     expandedBooks: Set<string>;
     dimensions: Dimensions;
     nodes: ViewNode[];

@@ -13,6 +13,8 @@ export function reducer(
                 expandedBooks: new Set(),
                 uiPhase: "ready",
             };
+        case "SET_ASK_HIT_MAP":
+            return { askHitMap: action.askHitMap ?? {} };
         case "TOGGLE_BOOK": {
             const nextExpanded = new Set(state.expandedBooks);
             if (nextExpanded.has(action.bookId)) {

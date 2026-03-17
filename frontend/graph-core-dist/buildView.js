@@ -39,7 +39,6 @@ function getAskHitVisuals(node) {
   const auraAlpha = level === "strong" ? 0.34 : level === "medium" ? 0.22 : 0.14;
   const auraRadius = level === "strong" ? 7 : level === "medium" ? 5 : 3;
   return {
-    score,
     level,
     fillColor: mixWithWhite(node.color, fillBoost),
     auraColor: rgba(node.color, auraAlpha),
