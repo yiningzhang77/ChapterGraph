@@ -223,7 +223,7 @@ If the frontend test setup is too thin, extract the hit-map builder into a small
 
 ### `test(smoke): validate phase1 ask hit highlight in the running UI`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
