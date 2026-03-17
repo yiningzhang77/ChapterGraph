@@ -2,7 +2,7 @@
 
 # Term Agent Tool Flow Commit List
 
-This document turns [term-agent-tool-flow-plan.md](C:/Users/hy/ChapterGraph/chatbot/term-agent-tool-flow-plan.md) into an implementation sequence.
+This document turns [term-agent-tool-flow-plan.md](C:/Users/hy/ChapterGraph/chatbot/term-ask/term-agent-tool-flow-plan.md) into an implementation sequence.
 
 Goal:
 

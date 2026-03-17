@@ -1,6 +1,6 @@
 ﻿# Robust Commit List
 
-This document turns [robust.md](C:/Users/hy/ChapterGraph/chatbot/robust.md) into an implementation sequence.
+This document turns [robust.md](C:/Users/hy/ChapterGraph/chatbot/term-narrowing/robust.md) into an implementation sequence.
 
 Goal:
 

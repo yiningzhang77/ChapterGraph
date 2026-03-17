@@ -1,6 +1,6 @@
 # Narrowing Commit List
 
-This document turns [narrowing-plan.md](C:/Users/hy/ChapterGraph/chatbot/narrowing-plan.md) into an implementation sequence.
+This document turns [narrowing-plan.md](C:/Users/hy/ChapterGraph/chatbot/term-narrowing/narrowing-plan.md) into an implementation sequence.
 
 Goal:
 

@@ -1,6 +1,6 @@
 ﻿# Term Commit List
 
-This document turns [term_optmize_plan.md](C:/Users/hy/ChapterGraph/chatbot/term_optmize_plan.md) into an implementation sequence.
+This document turns [term_optmize_plan.md](C:/Users/hy/ChapterGraph/chatbot/term-ask/term_optmize_plan.md) into an implementation sequence.
 
 Goal:
 

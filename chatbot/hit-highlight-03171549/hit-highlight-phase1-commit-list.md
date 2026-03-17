@@ -2,7 +2,7 @@
 
 # Hit Highlight Phase 1 Commit List
 
-This document turns Phase 1 of [hit-highlight-plan.md](C:/Users/hy/ChapterGraph/chatbot/hit-highlight-plan.md) into an implementation sequence.
+This document turns Phase 1 of [hit-highlight-plan.md](C:/Users/hy/ChapterGraph/chatbot/hit-highlight-03171549/hit-highlight-plan.md) into an implementation sequence.
 
 Goal:
 

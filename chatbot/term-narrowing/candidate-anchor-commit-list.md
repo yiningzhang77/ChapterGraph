@@ -1,6 +1,6 @@
 # Candidate Anchor Commit List
 
-This document turns [candidate-anchor-plan.md](C:/Users/hy/ChapterGraph/chatbot/candidate-anchor-plan.md) into an implementation sequence.
+This document turns [candidate-anchor-plan.md](C:/Users/hy/ChapterGraph/chatbot/term-narrowing/candidate-anchor-plan.md) into an implementation sequence.
 
 Goal:
 
