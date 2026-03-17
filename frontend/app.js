@@ -173,14 +173,21 @@ function App() {
                 }
                 const askHit = hit.askHit && typeof hit.askHit === "object" ? hit.askHit : null;
                 if (askHit && hit.type === "chapter") {
+                    const lastHitLabel = typeof askHit.lastHitAt === "number"
+                        ? new Date(askHit.lastHitAt).toLocaleTimeString()
+                        : null;
                     tooltip.innerHTML += `
                         <div style="margin-top:6px;border-top:1px solid rgba(148,163,184,0.28);padding-top:6px;">
                             <div style="opacity:0.75;">Current hit score: ${askHit.currentHitScore ?? 0}</div>
                             <div style="opacity:0.75;">Seed hit: ${askHit.isSeed ? "yes" : "no"}</div>
                             <div style="opacity:0.75;">Evidence sections: ${askHit.evidenceSectionCount ?? 0}</div>
                             <div style="opacity:0.75;">Evidence bullets: ${askHit.evidenceBulletCount ?? 0}</div>
+                            <div style="opacity:0.75;">Session hits: ${askHit.sessionHitCount ?? 0}</div>
                         </div>
                     `;
+                    if (lastHitLabel) {
+                        tooltip.innerHTML += `<div style="opacity:0.75;">Last hit: ${lastHitLabel}</div>`;
+                    }
                     if (typeof askHit.queryType === "string") {
                         tooltip.innerHTML += `<div style="opacity:0.75;">Query type: ${askHit.queryType}</div>`;
                     }

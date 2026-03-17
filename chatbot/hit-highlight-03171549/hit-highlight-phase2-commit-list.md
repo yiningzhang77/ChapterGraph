@@ -155,7 +155,7 @@ The key requirement is visual separation:
 
 ### `feat(frontend): add session hit details to hover panel`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
