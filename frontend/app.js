@@ -103,6 +103,7 @@ function App() {
         if (!selectedRun) return;
         dispatch({ type: "LOAD_GRAPH_START" });
         dispatch({ type: "SET_ASK_HIT_MAP", askHitMap: {} });
+        setSessionHitHistory({});
         setSelectedChapter(null);
         fetch(`${API}/graph?run_id=${selectedRun}`)
             .then((res) => res.json())

@@ -179,7 +179,7 @@ Current-hit details from Phase 1 should remain visible.
 
 ### `refactor(frontend): define reset boundaries for session heat`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
