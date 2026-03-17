@@ -81,7 +81,7 @@ But they must return typed contract objects from Commit 01.
 
 ### `feat(ask): add narrowing and candidate-anchor tool wrappers`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
