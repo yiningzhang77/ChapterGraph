@@ -180,7 +180,7 @@ Only the dependency boundary changes.
 
 ### `refactor(api): keep router and response shaping unchanged while term interfaces tighten`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

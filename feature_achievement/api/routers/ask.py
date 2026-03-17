@@ -81,43 +81,66 @@ def _build_graph_fragment(cluster_payload: dict[str, object]) -> dict[str, objec
     }
 
 
+def _run_term_request(
+    *,
+    req: AskRequest,
+    session: Session,
+) -> dict[str, object]:
+    return _coerce_term_flow_result(run_term_flow(req=req, session=session))
+
+
+def _run_chapter_request(
+    *,
+    req: AskRequest,
+    session: Session,
+) -> dict[str, object]:
+    cluster = build_cluster(session=session, req=req)
+    evidence = cluster.get("evidence") if isinstance(cluster.get("evidence"), dict) else None
+    cluster_payload = dict(cluster)
+    cluster_payload.pop("evidence", None)
+    answer_markdown: str | None = None
+    llm_error: str | None = None
+
+    if req.llm_enabled:
+        try:
+            answer_markdown = ask_qwen(
+                query=req.query or "",
+                query_type=req.query_type,
+                cluster=cluster_payload,
+                retrieval_term=None,
+                response_guidance=None,
+                model=req.llm_model,
+                timeout_ms=req.llm_timeout_ms,
+            )
+        except Exception as error:
+            llm_error = str(error)
+
+    return {
+        "cluster_payload": cluster_payload,
+        "evidence": evidence,
+        "retrieval_warnings": None,
+        "response_state": None,
+        "answer_markdown": answer_markdown,
+        "llm_error": llm_error,
+    }
+
+
 @router.post("/ask", response_model=AskResponse)
 def ask(
     req: AskRequest,
     session: Session = Depends(get_session),
 ):
     if req.query_type == "term":
-        term_result = _coerce_term_flow_result(run_term_flow(req=req, session=session))
-        cluster_payload = term_result["cluster_payload"]
-        evidence = term_result["evidence"]
-        retrieval_warnings = term_result["retrieval_warnings"]
-        response_state = term_result["response_state"]
-        answer_markdown = term_result["answer_markdown"]
-        llm_error = term_result["llm_error"]
+        request_result = _run_term_request(req=req, session=session)
     else:
-        cluster = build_cluster(session=session, req=req)
-        evidence = cluster.get("evidence") if isinstance(cluster.get("evidence"), dict) else None
-        cluster_payload = dict(cluster)
-        cluster_payload.pop("evidence", None)
-        retrieval_warnings = None
-        response_state = None
-        answer_markdown = None
-        llm_error = None
+        request_result = _run_chapter_request(req=req, session=session)
 
-    if req.query_type == "chapter" and req.llm_enabled:
-        if response_state != "needs_narrower_term":
-            try:
-                answer_markdown = ask_qwen(
-                    query=req.query or "",
-                    query_type=req.query_type,
-                    cluster=cluster_payload,
-                    retrieval_term=None,
-                    response_guidance=None,
-                    model=req.llm_model,
-                    timeout_ms=req.llm_timeout_ms,
-                )
-            except Exception as error:
-                llm_error = str(error)
+    cluster_payload = request_result["cluster_payload"]
+    evidence = request_result["evidence"]
+    retrieval_warnings = request_result["retrieval_warnings"]
+    response_state = request_result["response_state"]
+    answer_markdown = request_result["answer_markdown"]
+    llm_error = request_result["llm_error"]
 
     graph_fragment = (
         _build_graph_fragment(cluster_payload) if req.return_graph_fragment else None
