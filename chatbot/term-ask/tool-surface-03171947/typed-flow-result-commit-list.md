@@ -59,7 +59,7 @@ Update [term_flow.py](C:/Users/hy/ChapterGraph/feature_achievement/ask/term_flow
 
 `refactor(ask): make chapter_flow return ChapterFlowResult`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

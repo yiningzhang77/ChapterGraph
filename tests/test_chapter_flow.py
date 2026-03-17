@@ -4,7 +4,11 @@ from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest
 from feature_achievement.ask import chapter_flow
-from feature_achievement.ask.tool_contracts import ChapterClusterToolResult, TermAnswerToolResult
+from feature_achievement.ask.tool_contracts import (
+    ChapterClusterToolResult,
+    ChapterFlowResult,
+    TermAnswerToolResult,
+)
 
 
 def _cluster_result() -> ChapterClusterToolResult:
@@ -41,15 +45,19 @@ def test_run_chapter_flow_returns_service_shape(monkeypatch) -> None:
         session=cast(Session, object()),
     )
 
-    assert result == {
-        "cluster_payload": {"chapters": [], "edges": [], "seed": {"seed_chapter_ids": ["spring::ch2"]}},
-        "evidence": {"bullets": []},
-        "retrieval_warnings": None,
-        "response_state": None,
-        "response_guidance": None,
-        "answer_markdown": "chapter answer",
-        "llm_error": None,
-    }
+    assert result == ChapterFlowResult(
+        cluster_payload={
+            "chapters": [],
+            "edges": [],
+            "seed": {"seed_chapter_ids": ["spring::ch2"]},
+        },
+        evidence={"bullets": []},
+        retrieval_warnings=None,
+        response_state=None,
+        response_guidance=None,
+        answer_markdown="chapter answer",
+        llm_error=None,
+    )
 
 
 def test_generate_chapter_answer_uses_wrapper(monkeypatch) -> None:
