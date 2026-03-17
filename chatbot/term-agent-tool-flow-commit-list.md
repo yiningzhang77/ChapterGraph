@@ -190,7 +190,7 @@ The router should remain the HTTP adapter, not the orchestration layer.
 
 ### `test(ask): validate term_flow preserves current API behavior`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

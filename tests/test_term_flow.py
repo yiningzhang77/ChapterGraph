@@ -61,6 +61,80 @@ def test_run_term_flow_returns_service_shape(monkeypatch) -> None:
     }
 
 
+def test_run_term_flow_executes_broad_overview_path(monkeypatch) -> None:
+    req = AskRequest(
+        query_type="term",
+        term="Spring",
+        user_query="What is Spring?",
+        run_id=5,
+        llm_enabled=True,
+    )
+
+    monkeypatch.setattr(
+        term_flow,
+        "build_cluster",
+        lambda **kwargs: {
+            "schema_version": "cluster.v1",
+            "seed": {"seed_chapter_ids": ["a", "b", "c", "d", "e"]},
+            "chapters": [
+                {"chapter_id": "a", "book_id": "book0"},
+                {"chapter_id": "b", "book_id": "book1"},
+                {"chapter_id": "c", "book_id": "book2"},
+            ],
+            "edges": [],
+            "evidence": {
+                "bullets": [
+                    {"chapter_id": "a"},
+                    {"chapter_id": "b"},
+                    {"chapter_id": "c"},
+                    {"chapter_id": "d"},
+                    {"chapter_id": "e"},
+                ]
+            },
+        },
+    )
+    monkeypatch.setattr(
+        term_flow,
+        "recommend_narrower_terms",
+        lambda **kwargs: {
+            "reason": "spring_fallback",
+            "suggested_terms": ["Actuator", "JdbcTemplate"],
+            "source": "rule_based",
+            "confidence": "heuristic",
+        },
+    )
+    monkeypatch.setattr(
+        term_flow,
+        "ask_qwen",
+        lambda **kwargs: "overview answer",
+    )
+
+    result = term_flow.run_term_flow(
+        req=req,
+        session=cast(Session, object()),
+    )
+
+    assert result["response_state"] == "broad_overview"
+    assert result["answer_markdown"] == "overview answer"
+    retrieval_warnings = result["retrieval_warnings"]
+    assert retrieval_warnings == {
+        "state": "broad_allowed",
+        "term_too_broad": True,
+        "evidence_too_scattered": True,
+        "seed_count": 5,
+        "seed_threshold": 5,
+        "evidence_bullet_chapter_count": 5,
+        "evidence_book_count": 3,
+        "evidence_chapter_threshold": 5,
+        "evidence_book_threshold": 3,
+        "message": "This term is broad, so the answer is limited to a high-level overview.",
+        "suggested_terms": ["Actuator", "JdbcTemplate"],
+        "recommendation_reason": "spring_fallback",
+        "recommendation_source": "rule_based",
+        "recommendation_confidence": "heuristic",
+    }
+
+
 def test_build_term_cluster_splits_cluster_payload_and_evidence(
     monkeypatch,
 ) -> None:
