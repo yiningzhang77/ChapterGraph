@@ -59,3 +59,25 @@ class CandidateAnchorRankingToolResult:
 class TermAnswerToolResult:
     answer_markdown: str | None
     llm_error: str | None
+
+
+@dataclass(frozen=True)
+class TermFlowResult:
+    cluster_payload: dict[str, object]
+    evidence: dict[str, object] | None
+    retrieval_warnings: dict[str, object] | None
+    response_state: str | None
+    response_guidance: str | None
+    answer_markdown: str | None
+    llm_error: str | None
+
+
+@dataclass(frozen=True)
+class ChapterFlowResult:
+    cluster_payload: dict[str, object]
+    evidence: dict[str, object] | None
+    retrieval_warnings: dict[str, object] | None
+    response_state: str | None
+    response_guidance: str | None
+    answer_markdown: str | None
+    llm_error: str | None
