@@ -79,7 +79,7 @@ No behavior change.
 
 ### `refactor(ask): switch chapter_flow.py to unified tool surface imports`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

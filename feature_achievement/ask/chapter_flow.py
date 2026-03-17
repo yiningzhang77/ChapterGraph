@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest
-from feature_achievement.ask.chapter_tools import (
+from feature_achievement.ask.tools import (
     build_chapter_cluster_tool,
     generate_chapter_answer_tool,
 )
