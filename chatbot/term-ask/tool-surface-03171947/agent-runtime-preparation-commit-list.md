@@ -90,7 +90,7 @@ Prepare flow outputs for future non-HTTP callers.
 
 `test(ask): add focused coverage for runtime-facing surface exports`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 

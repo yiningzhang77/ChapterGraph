@@ -1,0 +1,22 @@
+from feature_achievement.ask import chapter_flow, runtime_surface, term_flow, tools
+
+
+def test_runtime_surface_exports_flow_entrypoints() -> None:
+    assert runtime_surface.run_term_flow is term_flow.run_term_flow
+    assert runtime_surface.run_chapter_flow is chapter_flow.run_chapter_flow
+
+
+def test_runtime_surface_exports_tool_entrypoints() -> None:
+    assert runtime_surface.build_term_cluster_tool is tools.build_term_cluster_tool
+    assert (
+        runtime_surface.evaluate_term_retrieval_quality_tool
+        is tools.evaluate_term_retrieval_quality_tool
+    )
+    assert (
+        runtime_surface.recommend_narrower_terms_tool
+        is tools.recommend_narrower_terms_tool
+    )
+    assert runtime_surface.rank_candidate_anchors_tool is tools.rank_candidate_anchors_tool
+    assert runtime_surface.generate_term_answer_tool is tools.generate_term_answer_tool
+    assert runtime_surface.build_chapter_cluster_tool is tools.build_chapter_cluster_tool
+    assert runtime_surface.generate_chapter_answer_tool is tools.generate_chapter_answer_tool
