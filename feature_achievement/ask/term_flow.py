@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Runtime-callable term flow entrypoint for /ask orchestration."""
+
 from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest
@@ -20,6 +22,8 @@ from feature_achievement.ask.tool_contracts import (
     RetrievalQualityToolResult,
     TermFlowResult,
 )
+
+__all__ = ["run_term_flow"]
 
 
 def run_term_flow(

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Unified runtime-callable capability surface for /ask."""
+
 from feature_achievement.ask.chapter_tools import (
     build_chapter_cluster_tool,
     generate_chapter_answer_tool,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+"""Runtime-callable chapter flow entrypoint for /ask orchestration."""
+
 from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest
@@ -9,6 +11,8 @@ from feature_achievement.ask.tools import (
 )
 from feature_achievement.ask.tool_contracts import ChapterClusterToolResult
 from feature_achievement.ask.tool_contracts import ChapterFlowResult
+
+__all__ = ["run_chapter_flow"]
 
 
 def run_chapter_flow(
