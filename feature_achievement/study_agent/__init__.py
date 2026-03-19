@@ -10,6 +10,13 @@ from feature_achievement.study_agent.plan_contracts import (
     PlanStage,
     StudyPlan,
 )
+from feature_achievement.study_agent.plan_change_contracts import (
+    InsertedPlanItemChange,
+    PlanChange,
+    PlanChangeSource,
+    RemovedPlanItemChange,
+    ReorderedPlanItemChange,
+)
 
 __all__ = [
     "GoalConstraints",
@@ -20,4 +27,9 @@ __all__ = [
     "PlanItemStatus",
     "PlanStage",
     "StudyPlan",
+    "InsertedPlanItemChange",
+    "PlanChange",
+    "PlanChangeSource",
+    "RemovedPlanItemChange",
+    "ReorderedPlanItemChange",
 ]
