@@ -63,7 +63,7 @@ Make the future runtime-facing vocabulary importable from one place.
 
 `test(ask): add focused coverage for planner and runtime contracts`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
