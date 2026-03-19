@@ -111,7 +111,7 @@ Add small tests for the new runtime-facing surface.
 
 `test(smoke): validate runtime preparation refactor`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
@@ -130,6 +130,14 @@ python -m feature_achievement.scripts.smoke_ask_cluster
 - tests pass
 - smoke passes
 - `/ask` behavior is unchanged
+
+### Validation completed on 2026-03-19 15:37
+
+```powershell
+python -m pytest -q
+python -m feature_achievement.scripts.smoke_ask
+python -m feature_achievement.scripts.smoke_ask_cluster
+```
 
 ## Recommended Order
 
