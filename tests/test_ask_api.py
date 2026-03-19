@@ -6,12 +6,11 @@ from fastapi.testclient import TestClient
 
 from feature_achievement.api.main import app
 from feature_achievement.api.routers import ask as ask_router
+from feature_achievement.ask.runtime_contracts import RuntimeRequest, RuntimeResult
 from feature_achievement.ask.tool_contracts import (
-    ChapterFlowResult,
     RUNTIME_STATE_BROAD_OVERVIEW,
     RUNTIME_STATE_NEEDS_NARROWER_TERM,
     RUNTIME_STATE_NORMAL,
-    TermFlowResult,
 )
 from feature_achievement.db.engine import get_session
 
@@ -42,7 +41,7 @@ def _payload(**overrides: object) -> dict[str, object]:
     return body
 
 
-def _term_flow_result(
+def _runtime_result(
     *,
     cluster_payload: dict[str, object],
     evidence: dict[str, object] | None,
@@ -51,36 +50,25 @@ def _term_flow_result(
     response_guidance: str | None = None,
     answer_markdown: str | None = None,
     llm_error: str | None = None,
-) -> TermFlowResult:
-    return TermFlowResult(
-        cluster_payload=cluster_payload,
-        evidence=evidence,
-        retrieval_warnings=retrieval_warnings,
+) -> RuntimeResult:
+    return RuntimeResult(
+        execution_id="runtime-test",
+        status=(
+            "blocked"
+            if runtime_state == RUNTIME_STATE_NEEDS_NARROWER_TERM
+            else "completed"
+        ),
+        final_state={
+            "cluster_payload": cluster_payload,
+            "evidence": evidence,
+            "retrieval_warnings": retrieval_warnings,
+            "response_guidance": response_guidance,
+            "llm_error": llm_error,
+        },
         runtime_state=runtime_state,
-        response_guidance=response_guidance,
         answer_markdown=answer_markdown,
-        llm_error=llm_error,
-    )
-
-
-def _chapter_flow_result(
-    *,
-    cluster_payload: dict[str, object],
-    evidence: dict[str, object] | None,
-    retrieval_warnings: dict[str, object] | None = None,
-    runtime_state: str = RUNTIME_STATE_NORMAL,
-    response_guidance: str | None = None,
-    answer_markdown: str | None = None,
-    llm_error: str | None = None,
-) -> ChapterFlowResult:
-    return ChapterFlowResult(
-        cluster_payload=cluster_payload,
-        evidence=evidence,
-        retrieval_warnings=retrieval_warnings,
-        runtime_state=runtime_state,
-        response_guidance=response_guidance,
-        answer_markdown=answer_markdown,
-        llm_error=llm_error,
+        events=[],
+        error_message=None,
     )
 
 
@@ -88,10 +76,10 @@ def test_ask_api_returns_404_for_missing_run(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_runtime(*args: object, **kwargs: object) -> RuntimeResult:
         raise HTTPException(status_code=404, detail="Run not found")
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
     response = client.post("/ask", json=_payload())
 
     assert response.status_code == 404
@@ -102,10 +90,10 @@ def test_ask_api_returns_409_for_version_mismatch(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_runtime(*args: object, **kwargs: object) -> RuntimeResult:
         raise HTTPException(status_code=409, detail="version mismatch")
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
     response = client.post("/ask", json=_payload())
 
     assert response.status_code == 409
@@ -116,10 +104,10 @@ def test_ask_api_returns_422_when_no_seed_found(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> dict[str, object]:
+    def fake_run_runtime(*args: object, **kwargs: object) -> RuntimeResult:
         raise HTTPException(status_code=422, detail="No seed chapters found")
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
     response = client.post("/ask", json=_payload())
 
     assert response.status_code == 422
@@ -130,8 +118,12 @@ def test_ask_api_term_flow_success_with_llm(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
-        return _term_flow_result(
+    def fake_run_runtime(*, request: RuntimeRequest, session: DummySession) -> RuntimeResult:
+        assert request.query_type == "term"
+        assert request.term == "Actuator"
+        assert request.query == "Explain the term \"Actuator\" using the retrieved cluster."
+        assert isinstance(session, DummySession)
+        return _runtime_result(
             cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "Actuator",
@@ -177,7 +169,7 @@ def test_ask_api_term_flow_success_with_llm(
             answer_markdown="answer ok",
         )
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
 
     response = client.post(
         "/ask",
@@ -203,16 +195,15 @@ def test_ask_api_chapter_flow_success(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_chapter_flow(*args: object, **kwargs: object) -> ChapterFlowResult:
-        req = kwargs.get("req")
-        assert req is not None
-        assert req.query_type == "chapter"
-        assert req.chapter_id == "spring::ch2"
+    def fake_run_runtime(*, request: RuntimeRequest, session: DummySession) -> RuntimeResult:
+        assert request.query_type == "chapter"
+        assert request.chapter_id == "spring::ch2"
         assert (
-            req.query
+            request.query
             == 'Summarize the selected chapter "spring::ch2" using the retrieved cluster.'
         )
-        return _chapter_flow_result(
+        assert isinstance(session, DummySession)
+        return _runtime_result(
             cluster_payload={
             "schema_version": "cluster.v1",
             "query": "Explain selected chapter",
@@ -238,7 +229,7 @@ def test_ask_api_chapter_flow_success(
             evidence={"sections": [], "bullets": []},
         )
 
-    monkeypatch.setattr(ask_router, "run_chapter_flow", fake_run_chapter_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
 
     response = client.post(
         "/ask",
@@ -262,8 +253,8 @@ def test_ask_api_records_llm_error_in_meta(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
-        return _term_flow_result(
+    def fake_run_runtime(*args: object, **kwargs: object) -> RuntimeResult:
+        return _runtime_result(
             cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "Actuator",
@@ -282,7 +273,7 @@ def test_ask_api_records_llm_error_in_meta(
             llm_error="llm failure",
         )
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
 
     response = client.post("/ask", json=_payload(llm_enabled=True))
 
@@ -296,9 +287,9 @@ def test_ask_api_blocks_broad_precise_term_request(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
+    def fake_run_runtime(*args: object, **kwargs: object) -> RuntimeResult:
         _ = (args, kwargs)
-        return _term_flow_result(
+        return _runtime_result(
             cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "How does Spring implement data persistence?",
@@ -358,7 +349,7 @@ def test_ask_api_blocks_broad_precise_term_request(
             runtime_state=RUNTIME_STATE_NEEDS_NARROWER_TERM,
         )
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
 
     response = client.post(
         "/ask",
@@ -397,8 +388,8 @@ def test_ask_api_allows_broad_definition_term_request(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
-        return _term_flow_result(
+    def fake_run_runtime(*args: object, **kwargs: object) -> RuntimeResult:
+        return _runtime_result(
             cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "What is Spring?",
@@ -457,7 +448,7 @@ def test_ask_api_allows_broad_definition_term_request(
             answer_markdown="broad overview answer",
         )
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
 
     response = client.post(
         "/ask",
@@ -490,8 +481,8 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
-        return _term_flow_result(
+    def fake_run_runtime(*args: object, **kwargs: object) -> RuntimeResult:
+        return _runtime_result(
             cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "How does Spring implement data persistence?",
@@ -545,7 +536,7 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
             runtime_state=RUNTIME_STATE_NEEDS_NARROWER_TERM,
         )
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
 
     response = client.post(
         "/ask",
@@ -571,10 +562,10 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_term_flow(*args: object, **kwargs: object) -> TermFlowResult:
-        req = kwargs.get("req")
-        if getattr(req, "term", None) == "Spring":
-            return _term_flow_result(
+    def fake_run_runtime(*, request: RuntimeRequest, session: DummySession) -> RuntimeResult:
+        _ = session
+        if request.term == "Spring":
+            return _runtime_result(
                 cluster_payload={
                     "schema_version": "cluster.v1",
                     "query": "How does Spring implement data persistence?",
@@ -628,7 +619,7 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                 runtime_state=RUNTIME_STATE_NEEDS_NARROWER_TERM,
             )
 
-        return _term_flow_result(
+        return _runtime_result(
             cluster_payload={
                 "schema_version": "cluster.v1",
                 "query": "How does Spring implement data persistence?",
@@ -655,7 +646,7 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
             },
         )
 
-    monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
 
     blocked_response = client.post(
         "/ask",
@@ -711,11 +702,10 @@ def test_ask_api_chapter_flow_success_with_explicit_query(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def fake_run_chapter_flow(*args: object, **kwargs: object) -> ChapterFlowResult:
-        req = kwargs.get("req")
-        assert req is not None
-        assert req.query == "Explain selected chapter"
-        return _chapter_flow_result(
+    def fake_run_runtime(*, request: RuntimeRequest, session: DummySession) -> RuntimeResult:
+        assert request.query == "Explain selected chapter"
+        assert isinstance(session, DummySession)
+        return _runtime_result(
             cluster_payload={
             "schema_version": "cluster.v1",
             "query": "Explain selected chapter",
@@ -733,7 +723,7 @@ def test_ask_api_chapter_flow_success_with_explicit_query(
             evidence={"sections": [], "bullets": []},
         )
 
-    monkeypatch.setattr(ask_router, "run_chapter_flow", fake_run_chapter_flow)
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
 
     response = client.post(
         "/ask",
