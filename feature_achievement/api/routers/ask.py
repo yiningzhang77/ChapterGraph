@@ -2,10 +2,9 @@ from fastapi import APIRouter, Depends
 from sqlmodel import Session
 
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
-from feature_achievement.ask.chapter_flow import run_chapter_flow
-from feature_achievement.ask.term_flow import run_term_flow
+from feature_achievement.ask.runtime import run_runtime
+from feature_achievement.ask.runtime_adapter import to_runtime_request
 from feature_achievement.ask.tool_contracts import RUNTIME_STATE_NORMAL
-from feature_achievement.ask.tool_contracts import ChapterFlowResult, TermFlowResult
 from feature_achievement.db.engine import get_session
 
 router = APIRouter(prefix="", tags=["ask"])
@@ -56,39 +55,30 @@ def _build_graph_fragment(cluster_payload: dict[str, object]) -> dict[str, objec
         "edges": edges,
     }
 
-
-def _run_term_request(
-    *,
-    req: AskRequest,
-    session: Session,
-) -> TermFlowResult:
-    return run_term_flow(req=req, session=session)
-
-
-def _run_chapter_request(
-    *,
-    req: AskRequest,
-    session: Session,
-) -> ChapterFlowResult:
-    return run_chapter_flow(req=req, session=session)
-
-
 @router.post("/ask", response_model=AskResponse)
 def ask(
     req: AskRequest,
     session: Session = Depends(get_session),
 ):
-    if req.query_type == "term":
-        request_result = _run_term_request(req=req, session=session)
-    else:
-        request_result = _run_chapter_request(req=req, session=session)
+    runtime_request = to_runtime_request(req)
+    runtime_result = run_runtime(request=runtime_request, session=session)
 
-    cluster_payload = request_result.cluster_payload
-    evidence = request_result.evidence
-    retrieval_warnings = request_result.retrieval_warnings
-    runtime_state = request_result.runtime_state
-    answer_markdown = request_result.answer_markdown
-    llm_error = request_result.llm_error
+    final_state = runtime_result.final_state
+    cluster_payload = final_state.get("cluster_payload")
+    evidence = final_state.get("evidence")
+    retrieval_warnings = final_state.get("retrieval_warnings")
+    llm_error = final_state.get("llm_error")
+    runtime_state = runtime_result.runtime_state
+    answer_markdown = runtime_result.answer_markdown
+
+    if not isinstance(cluster_payload, dict):
+        cluster_payload = {"schema_version": "cluster.v1", "chapters": [], "edges": []}
+    if evidence is not None and not isinstance(evidence, dict):
+        evidence = None
+    if retrieval_warnings is not None and not isinstance(retrieval_warnings, dict):
+        retrieval_warnings = None
+    if llm_error is not None and not isinstance(llm_error, str):
+        llm_error = None
 
     graph_fragment = (
         _build_graph_fragment(cluster_payload) if req.return_graph_fragment else None
