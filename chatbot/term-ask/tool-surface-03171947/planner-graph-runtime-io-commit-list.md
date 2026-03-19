@@ -84,7 +84,7 @@ Add focused tests for the new runtime contracts and exports.
 
 `test(smoke): validate planner/runtime contract introduction is behavior-neutral`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
@@ -103,6 +103,14 @@ python -m feature_achievement.scripts.smoke_ask_cluster
 - tests pass
 - smoke passes
 - `/ask` behavior is unchanged
+
+### Validation completed on 2026-03-19 18:56
+
+```powershell
+python -m pytest -q
+python -m feature_achievement.scripts.smoke_ask
+python -m feature_achievement.scripts.smoke_ask_cluster
+```
 
 ## Recommended Order
 
