@@ -19,6 +19,9 @@ from feature_achievement.ask.tools import (
 from feature_achievement.ask.tool_contracts import (
     ClusterToolResult,
     NarrowingRecommendationToolResult,
+    RUNTIME_STATE_BROAD_OVERVIEW,
+    RUNTIME_STATE_NEEDS_NARROWER_TERM,
+    RUNTIME_STATE_NORMAL,
     RetrievalQualityToolResult,
     TermFlowResult,
 )
@@ -49,7 +52,7 @@ def run_term_flow(
         cluster_payload=cluster_result.cluster,
         evidence=cluster_result.evidence,
         retrieval_warnings=quality_result.retrieval_warnings,
-        response_state=answer_result["response_state"],
+        runtime_state=answer_result["runtime_state"],
         response_guidance=answer_result["response_guidance"],
         answer_markdown=answer_result["answer_markdown"],
         llm_error=answer_result["llm_error"],
@@ -164,22 +167,24 @@ def _generate_term_answer(
     narrowing_result: dict[str, object],
 ) -> dict[str, object]:
     retrieval_warnings = quality_result.retrieval_warnings
-    response_state = _response_state_from_quality(quality_result.state)
+    runtime_state = _runtime_state_from_quality(quality_result.state)
     suggested_terms = narrowing_result.get("suggested_terms")
     response_guidance: str | None = None
-    if response_state == "broad_overview":
+    if runtime_state == RUNTIME_STATE_BROAD_OVERVIEW:
         response_guidance = broad_overview_prompt_note(
             suggested_terms if isinstance(suggested_terms, list) else []
         )
 
     answer_markdown: str | None = None
     llm_error: str | None = None
-    if req.llm_enabled and response_state != "needs_narrower_term":
+    if req.llm_enabled and runtime_state != RUNTIME_STATE_NEEDS_NARROWER_TERM:
         answer_result = generate_term_answer_tool(
             term=req.term or "",
             user_query=req.user_query,
             cluster=cluster_result.cluster,
-            response_mode="overview" if response_state == "broad_overview" else "normal",
+            response_mode="overview"
+            if runtime_state == RUNTIME_STATE_BROAD_OVERVIEW
+            else "normal",
             response_guidance=response_guidance,
             llm_enabled=req.llm_enabled,
             llm_model=req.llm_model,
@@ -189,16 +194,16 @@ def _generate_term_answer(
         llm_error = answer_result.llm_error
 
     return {
-        "response_state": response_state,
+        "runtime_state": runtime_state,
         "response_guidance": response_guidance,
         "answer_markdown": answer_markdown,
         "llm_error": llm_error,
     }
 
 
-def _response_state_from_quality(state: str | None) -> str | None:
+def _runtime_state_from_quality(state: str | None) -> str:
     if state == "broad_blocked":
-        return "needs_narrower_term"
+        return RUNTIME_STATE_NEEDS_NARROWER_TERM
     if state == "broad_allowed":
-        return "broad_overview"
-    return None
+        return RUNTIME_STATE_BROAD_OVERVIEW
+    return RUNTIME_STATE_NORMAL

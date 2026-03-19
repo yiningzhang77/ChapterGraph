@@ -7,6 +7,7 @@ from feature_achievement.ask import chapter_flow
 from feature_achievement.ask.tool_contracts import (
     ChapterClusterToolResult,
     ChapterFlowResult,
+    RUNTIME_STATE_NORMAL,
     TermAnswerToolResult,
 )
 
@@ -53,7 +54,7 @@ def test_run_chapter_flow_returns_service_shape(monkeypatch) -> None:
         },
         evidence={"bullets": []},
         retrieval_warnings=None,
-        response_state=None,
+        runtime_state=RUNTIME_STATE_NORMAL,
         response_guidance=None,
         answer_markdown="chapter answer",
         llm_error=None,

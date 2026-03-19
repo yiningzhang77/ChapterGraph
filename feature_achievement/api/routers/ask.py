@@ -4,6 +4,7 @@ from sqlmodel import Session
 from feature_achievement.api.schemas.ask import AskRequest, AskResponse
 from feature_achievement.ask.chapter_flow import run_chapter_flow
 from feature_achievement.ask.term_flow import run_term_flow
+from feature_achievement.ask.tool_contracts import RUNTIME_STATE_NORMAL
 from feature_achievement.ask.tool_contracts import ChapterFlowResult, TermFlowResult
 from feature_achievement.db.engine import get_session
 
@@ -85,7 +86,7 @@ def ask(
     cluster_payload = request_result.cluster_payload
     evidence = request_result.evidence
     retrieval_warnings = request_result.retrieval_warnings
-    response_state = request_result.response_state
+    runtime_state = request_result.runtime_state
     answer_markdown = request_result.answer_markdown
     llm_error = request_result.llm_error
 
@@ -94,8 +95,8 @@ def ask(
     )
 
     meta: dict[str, object] = {"schema_version": "cluster.v1"}
-    if response_state:
-        meta["response_state"] = response_state
+    if runtime_state != RUNTIME_STATE_NORMAL:
+        meta["response_state"] = runtime_state
     if retrieval_warnings:
         meta["retrieval_warnings"] = retrieval_warnings
     if llm_error:

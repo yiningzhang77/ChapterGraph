@@ -1,6 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
+
+RUNTIME_STATE_NORMAL = "normal"
+RUNTIME_STATE_BROAD_OVERVIEW = "broad_overview"
+RUNTIME_STATE_NEEDS_NARROWER_TERM = "needs_narrower_term"
+
+RuntimeState = Literal[
+    "normal",
+    "broad_overview",
+    "needs_narrower_term",
+]
 
 
 @dataclass(frozen=True)
@@ -66,7 +77,7 @@ class TermFlowResult:
     cluster_payload: dict[str, object]
     evidence: dict[str, object] | None
     retrieval_warnings: dict[str, object] | None
-    response_state: str | None
+    runtime_state: RuntimeState
     response_guidance: str | None
     answer_markdown: str | None
     llm_error: str | None
@@ -77,7 +88,7 @@ class ChapterFlowResult:
     cluster_payload: dict[str, object]
     evidence: dict[str, object] | None
     retrieval_warnings: dict[str, object] | None
-    response_state: str | None
+    runtime_state: RuntimeState
     response_guidance: str | None
     answer_markdown: str | None
     llm_error: str | None

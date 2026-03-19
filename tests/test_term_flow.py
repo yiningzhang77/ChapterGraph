@@ -9,6 +9,9 @@ from feature_achievement.ask.tool_contracts import (
     CandidateAnchorRankingToolResult,
     ClusterToolResult,
     NarrowingRecommendationToolResult,
+    RUNTIME_STATE_BROAD_OVERVIEW,
+    RUNTIME_STATE_NEEDS_NARROWER_TERM,
+    RUNTIME_STATE_NORMAL,
     RetrievalQualityToolResult,
     TermAnswerToolResult,
     TermFlowResult,
@@ -54,7 +57,7 @@ def test_run_term_flow_returns_service_shape(monkeypatch) -> None:
         term_flow,
         "_generate_term_answer",
         lambda **kwargs: {
-            "response_state": None,
+            "runtime_state": RUNTIME_STATE_NORMAL,
             "response_guidance": None,
             "answer_markdown": "answer",
             "llm_error": None,
@@ -74,7 +77,7 @@ def test_run_term_flow_returns_service_shape(monkeypatch) -> None:
         },
         evidence={"bullets": []},
         retrieval_warnings={"state": "normal"},
-        response_state=None,
+        runtime_state=RUNTIME_STATE_NORMAL,
         response_guidance=None,
         answer_markdown="answer",
         llm_error=None,
@@ -254,7 +257,7 @@ def test_generate_term_answer_skips_llm_for_blocked_state() -> None:
     )
 
     assert result == {
-        "response_state": "needs_narrower_term",
+        "runtime_state": RUNTIME_STATE_NEEDS_NARROWER_TERM,
         "response_guidance": None,
         "answer_markdown": None,
         "llm_error": None,
@@ -291,7 +294,7 @@ def test_generate_term_answer_uses_wrapper_for_overview_state(monkeypatch) -> No
         narrowing_result={"suggested_terms": ["Spring Data", "JdbcTemplate"]},
     )
 
-    assert result["response_state"] == "broad_overview"
+    assert result["runtime_state"] == RUNTIME_STATE_BROAD_OVERVIEW
     assert result["answer_markdown"] == "overview"
     assert "high-level concept explanation" in str(result["response_guidance"])
     assert captured["response_mode"] == "overview"
@@ -325,7 +328,7 @@ def test_run_term_flow_preserves_broad_overview_state(monkeypatch) -> None:
         term_flow,
         "_generate_term_answer",
         lambda **kwargs: {
-            "response_state": "broad_overview",
+            "runtime_state": RUNTIME_STATE_BROAD_OVERVIEW,
             "response_guidance": "overview guidance",
             "answer_markdown": "overview answer",
             "llm_error": None,
@@ -334,7 +337,7 @@ def test_run_term_flow_preserves_broad_overview_state(monkeypatch) -> None:
 
     result = term_flow.run_term_flow(req=req, session=cast(Session, object()))
 
-    assert result.response_state == "broad_overview"
+    assert result.runtime_state == RUNTIME_STATE_BROAD_OVERVIEW
     assert result.answer_markdown == "overview answer"
 
 
@@ -366,7 +369,7 @@ def test_run_term_flow_preserves_blocked_state(monkeypatch) -> None:
         term_flow,
         "_generate_term_answer",
         lambda **kwargs: {
-            "response_state": "needs_narrower_term",
+            "runtime_state": RUNTIME_STATE_NEEDS_NARROWER_TERM,
             "response_guidance": None,
             "answer_markdown": None,
             "llm_error": None,
@@ -375,5 +378,5 @@ def test_run_term_flow_preserves_blocked_state(monkeypatch) -> None:
 
     result = term_flow.run_term_flow(req=req, session=cast(Session, object()))
 
-    assert result.response_state == "needs_narrower_term"
+    assert result.runtime_state == RUNTIME_STATE_NEEDS_NARROWER_TERM
     assert result.answer_markdown is None

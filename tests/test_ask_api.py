@@ -6,7 +6,13 @@ from fastapi.testclient import TestClient
 
 from feature_achievement.api.main import app
 from feature_achievement.api.routers import ask as ask_router
-from feature_achievement.ask.tool_contracts import ChapterFlowResult, TermFlowResult
+from feature_achievement.ask.tool_contracts import (
+    ChapterFlowResult,
+    RUNTIME_STATE_BROAD_OVERVIEW,
+    RUNTIME_STATE_NEEDS_NARROWER_TERM,
+    RUNTIME_STATE_NORMAL,
+    TermFlowResult,
+)
 from feature_achievement.db.engine import get_session
 
 
@@ -41,7 +47,7 @@ def _term_flow_result(
     cluster_payload: dict[str, object],
     evidence: dict[str, object] | None,
     retrieval_warnings: dict[str, object] | None = None,
-    response_state: str | None = None,
+    runtime_state: str = RUNTIME_STATE_NORMAL,
     response_guidance: str | None = None,
     answer_markdown: str | None = None,
     llm_error: str | None = None,
@@ -50,7 +56,7 @@ def _term_flow_result(
         cluster_payload=cluster_payload,
         evidence=evidence,
         retrieval_warnings=retrieval_warnings,
-        response_state=response_state,
+        runtime_state=runtime_state,
         response_guidance=response_guidance,
         answer_markdown=answer_markdown,
         llm_error=llm_error,
@@ -62,7 +68,7 @@ def _chapter_flow_result(
     cluster_payload: dict[str, object],
     evidence: dict[str, object] | None,
     retrieval_warnings: dict[str, object] | None = None,
-    response_state: str | None = None,
+    runtime_state: str = RUNTIME_STATE_NORMAL,
     response_guidance: str | None = None,
     answer_markdown: str | None = None,
     llm_error: str | None = None,
@@ -71,7 +77,7 @@ def _chapter_flow_result(
         cluster_payload=cluster_payload,
         evidence=evidence,
         retrieval_warnings=retrieval_warnings,
-        response_state=response_state,
+        runtime_state=runtime_state,
         response_guidance=response_guidance,
         answer_markdown=answer_markdown,
         llm_error=llm_error,
@@ -349,7 +355,7 @@ def test_ask_api_blocks_broad_precise_term_request(
                 "recommendation_source": "rule_based",
                 "recommendation_confidence": "heuristic",
             },
-            response_state="needs_narrower_term",
+            runtime_state=RUNTIME_STATE_NEEDS_NARROWER_TERM,
         )
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
@@ -443,7 +449,7 @@ def test_ask_api_allows_broad_definition_term_request(
                 "recommendation_source": "rule_based",
                 "recommendation_confidence": "heuristic",
             },
-            response_state="broad_overview",
+            runtime_state=RUNTIME_STATE_BROAD_OVERVIEW,
             response_guidance=(
                 "Warning: retrieval is broad. Give only a concise "
                 "high-level concept explanation."
@@ -536,7 +542,7 @@ def test_ask_api_falls_back_to_recommender_order_when_candidate_ranking_fails(
                 "recommendation_source": "rule_based",
                 "recommendation_confidence": "heuristic",
             },
-            response_state="needs_narrower_term",
+            runtime_state=RUNTIME_STATE_NEEDS_NARROWER_TERM,
         )
 
     monkeypatch.setattr(ask_router, "run_term_flow", fake_run_term_flow)
@@ -619,7 +625,7 @@ def test_ask_api_retry_with_narrower_term_clears_blocked_state(
                     "recommendation_source": "rule_based",
                     "recommendation_confidence": "heuristic",
                 },
-                response_state="needs_narrower_term",
+                runtime_state=RUNTIME_STATE_NEEDS_NARROWER_TERM,
             )
 
         return _term_flow_result(

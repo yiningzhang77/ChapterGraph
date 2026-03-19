@@ -11,6 +11,7 @@ from feature_achievement.ask.tools import (
 )
 from feature_achievement.ask.tool_contracts import ChapterClusterToolResult
 from feature_achievement.ask.tool_contracts import ChapterFlowResult
+from feature_achievement.ask.tool_contracts import RUNTIME_STATE_NORMAL
 
 __all__ = ["run_chapter_flow"]
 
@@ -26,7 +27,7 @@ def run_chapter_flow(
         cluster_payload=cluster_result.cluster,
         evidence=cluster_result.evidence,
         retrieval_warnings=None,
-        response_state=None,
+        runtime_state=RUNTIME_STATE_NORMAL,
         response_guidance=None,
         answer_markdown=answer_result["answer_markdown"],
         llm_error=answer_result["llm_error"],

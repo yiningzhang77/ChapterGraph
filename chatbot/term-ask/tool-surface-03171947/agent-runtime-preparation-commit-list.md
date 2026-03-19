@@ -67,7 +67,7 @@ Do not:
 
 `refactor(ask): centralize runtime-facing state semantics`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
