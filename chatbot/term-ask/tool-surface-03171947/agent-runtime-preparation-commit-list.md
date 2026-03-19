@@ -41,7 +41,7 @@ Make the runtime-callable boundaries explicit in code/docs.
 
 `feat(ask): add thin runtime-facing surface module`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
