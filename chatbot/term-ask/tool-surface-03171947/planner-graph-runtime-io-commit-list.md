@@ -43,7 +43,7 @@ Add typed runtime-side contract classes in code.
 
 `feat(ask): expose runtime contracts through runtime surface`
 
-Status: `pending`
+Status: `completed`
 
 ### Scope
 
