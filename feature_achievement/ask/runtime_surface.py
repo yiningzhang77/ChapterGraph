@@ -3,6 +3,7 @@ from __future__ import annotations
 """Thin runtime-facing surface for future agent/runtime callers."""
 
 from feature_achievement.ask.chapter_flow import run_chapter_flow
+from feature_achievement.ask.runtime_adapter import to_runtime_request
 from feature_achievement.ask.runtime_contracts import (
     GraphNodeName,
     PlannerActionType,
@@ -15,6 +16,7 @@ from feature_achievement.ask.runtime_contracts import (
     RuntimeStepResult,
     RuntimeStepStatus,
 )
+from feature_achievement.ask.runtime import run_runtime
 from feature_achievement.ask.term_flow import run_term_flow
 from feature_achievement.ask.tools import (
     build_chapter_cluster_tool,
@@ -29,6 +31,8 @@ from feature_achievement.ask.tools import (
 __all__ = [
     "run_term_flow",
     "run_chapter_flow",
+    "run_runtime",
+    "to_runtime_request",
     "RuntimeQueryType",
     "RuntimeStepStatus",
     "RuntimeExecutionStatus",

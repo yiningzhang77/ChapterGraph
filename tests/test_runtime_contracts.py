@@ -12,6 +12,12 @@ def test_runtime_request_fields_are_explicit() -> None:
         query_type="term",
         run_id=5,
         enrichment_version="v2_indexed_sections_bullets",
+        max_hops=2,
+        seed_top_k=5,
+        neighbor_top_k=40,
+        section_top_k=10,
+        bullet_top_k=20,
+        min_edge_score=0.2,
         llm_enabled=True,
         llm_model="qwen",
         llm_timeout_ms=20_000,
@@ -26,6 +32,7 @@ def test_runtime_request_fields_are_explicit() -> None:
     assert request.query_type == "term"
     assert request.term == "Actuator"
     assert request.chapter_id is None
+    assert request.max_hops == 2
 
 
 def test_runtime_step_and_execution_results_capture_status_and_payloads() -> None:
@@ -33,6 +40,12 @@ def test_runtime_step_and_execution_results_capture_status_and_payloads() -> Non
         query_type="chapter",
         run_id=5,
         enrichment_version="v2_indexed_sections_bullets",
+        max_hops=2,
+        seed_top_k=5,
+        neighbor_top_k=40,
+        section_top_k=10,
+        bullet_top_k=20,
+        min_edge_score=0.2,
         llm_enabled=False,
         llm_model=None,
         llm_timeout_ms=20_000,

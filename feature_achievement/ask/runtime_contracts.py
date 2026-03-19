@@ -41,6 +41,12 @@ class RuntimeRequest:
     query_type: RuntimeQueryType
     run_id: int
     enrichment_version: str
+    max_hops: int
+    seed_top_k: int
+    neighbor_top_k: int
+    section_top_k: int
+    bullet_top_k: int
+    min_edge_score: float
     llm_enabled: bool
     llm_model: str | None
     llm_timeout_ms: int
