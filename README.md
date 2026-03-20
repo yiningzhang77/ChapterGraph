@@ -140,6 +140,8 @@ python -m feature_achievement.scripts.normalize_enrichment_version
 
 ## API overview
 
+- `GET /healthz`: process liveness probe
+- `GET /readyz`: database readiness probe
 - `POST /compute-edges`: compute and persist graph edges for a run
 - `GET /runs`: list runs
 - `GET /graph?run_id=...`: fetch graph for frontend rendering
