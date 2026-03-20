@@ -4,6 +4,21 @@ from feature_achievement.api.main import app
 from feature_achievement.api.routers import health as health_router
 
 
+def test_root_returns_service_summary() -> None:
+    with TestClient(app) as client:
+        response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "service": "ChapterGraph API",
+        "status": "ok",
+        "docs": "/docs",
+        "openapi": "/openapi.json",
+        "healthz": "/healthz",
+        "readyz": "/readyz",
+    }
+
+
 def test_healthz_returns_ok() -> None:
     with TestClient(app) as client:
         response = client.get("/healthz")

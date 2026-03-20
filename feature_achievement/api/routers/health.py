@@ -11,6 +11,18 @@ def check_database_ready() -> None:
         connection.execute(text("SELECT 1"))
 
 
+@router.get("/")
+def root() -> dict[str, object]:
+    return {
+        "service": "ChapterGraph API",
+        "status": "ok",
+        "docs": "/docs",
+        "openapi": "/openapi.json",
+        "healthz": "/healthz",
+        "readyz": "/readyz",
+    }
+
+
 @router.get("/healthz")
 def healthz() -> dict[str, str]:
     return {"status": "ok"}
