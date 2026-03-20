@@ -7,6 +7,7 @@ frontend/graph-core-dist
 frontend/node_modules
 config/llm.env
 config/app.env
+config/db_migration.env
 /tmp
 book_epub/
 chatbot/
