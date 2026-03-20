@@ -79,6 +79,27 @@ PowerShell one-click helper:
 .\scripts\run_local.ps1
 ```
 
+## App config
+
+Copy the app config template if you want to override the default local DB or
+allow deployed frontend origins:
+
+```bash
+cp config/app.env.example config/app.env
+```
+
+Supported variables:
+
+```env
+DATABASE_URL=postgresql+psycopg2://postgres:1234@localhost:5432/chaptergraph
+CORS_ORIGINS=http://localhost:5500,http://127.0.0.1:5500
+```
+
+Notes:
+
+- `DATABASE_URL` falls back to the current local Postgres default when unset.
+- `CORS_ORIGINS` is a comma-separated allowlist for browser requests.
+
 ## LLM config
 
 Copy template and fill your provider values:
