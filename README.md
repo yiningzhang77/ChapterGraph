@@ -46,19 +46,25 @@ frontend/
 
 ## Quick start
 
-1. Initialize DB schema (first time only):
+1. Install Python dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+2. Initialize DB schema (first time only):
 
 ```bash
 python -m feature_achievement.scripts.init_db
 ```
 
-2. Start backend:
+3. Start backend:
 
 ```bash
 uvicorn feature_achievement.api.main:app --reload
 ```
 
-3. Build frontend graph-core and start static server:
+4. Build frontend graph-core and start static server:
 
 ```bash
 cd frontend
@@ -67,7 +73,7 @@ npm run build:core
 python -m http.server 5500
 ```
 
-4. Open UI:
+5. Open UI:
 
 ```text
 http://127.0.0.1:5500/index.html?api=http://127.0.0.1:8000
