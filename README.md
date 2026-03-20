@@ -76,7 +76,7 @@ python -m http.server 5500
 5. Open UI:
 
 ```text
-http://127.0.0.1:5500/index.html?api=http://127.0.0.1:8000
+http://127.0.0.1:5500/index.html
 ```
 
 PowerShell one-click helper:
@@ -84,6 +84,12 @@ PowerShell one-click helper:
 ```powershell
 .\scripts\run_local.ps1
 ```
+
+Frontend API resolution order:
+
+1. `?api=...` query parameter
+2. `frontend/runtime-config.js` -> `window.CHAPTERGRAPH_CONFIG.apiBaseUrl`
+3. default `http://127.0.0.1:8000`
 
 ## App config
 

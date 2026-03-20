@@ -12,9 +12,29 @@ import {
 } from "./askHitMap.js";
 import { reducer as coreReducer } from "./graph-core-dist/reducer.js";
 
-const API =
-    new URLSearchParams(window.location.search).get("api") ??
-    "http://127.0.0.1:8000";
+function resolveApiBaseUrl() {
+    const fromQuery = new URLSearchParams(window.location.search).get("api");
+    if (fromQuery) {
+        return fromQuery;
+    }
+
+    const runtimeConfig =
+        window.CHAPTERGRAPH_CONFIG &&
+        typeof window.CHAPTERGRAPH_CONFIG === "object"
+            ? window.CHAPTERGRAPH_CONFIG
+            : null;
+    const fromRuntimeConfig =
+        runtimeConfig && typeof runtimeConfig.apiBaseUrl === "string"
+            ? runtimeConfig.apiBaseUrl.trim()
+            : "";
+    if (fromRuntimeConfig) {
+        return fromRuntimeConfig;
+    }
+
+    return "http://127.0.0.1:8000";
+}
+
+const API = resolveApiBaseUrl();
 const h = React.createElement;
 
 function createInitialState() {
