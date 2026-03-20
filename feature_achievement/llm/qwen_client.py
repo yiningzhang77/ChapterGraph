@@ -24,6 +24,13 @@ def _load_local_env_config() -> None:
             os.environ[key] = value
 
 
+def _normalized_provider() -> str:
+    raw = os.getenv("QWEN_PROVIDER", "stub").strip().lower()
+    if raw == "openai-compatible":
+        return "openai_compatible"
+    return raw
+
+
 def _extract_seed_citations(cluster: dict[str, object]) -> list[str]:
     seed = cluster.get("seed")
     if not isinstance(seed, dict):
@@ -189,7 +196,7 @@ def ask_qwen(
     timeout_ms: int,
 ) -> str:
     _load_local_env_config()
-    provider = os.getenv("QWEN_PROVIDER", "stub").strip().lower()
+    provider = _normalized_provider()
     _ = (
         SYSTEM_PROMPT,
         build_prompt(
@@ -218,7 +225,7 @@ def ask_qwen(
             "## Citations\nnone"
         )
 
-    if provider in {"openai_compatible", "openai-compatible", "dashscope"}:
+    if provider in {"openai_compatible", "dashscope"}:
         return _ask_openai_compatible(
             query=query,
             query_type=query_type,

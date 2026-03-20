@@ -126,6 +126,8 @@ QWEN_MODEL=qwen2.5-7b-instruct
 Notes:
 
 - If `QWEN_PROVIDER=stub`, `/ask` always returns deterministic stub markdown.
+- Supported non-stub values: `openai_compatible`, `dashscope`.
+- `openai-compatible` is still accepted as a legacy alias and normalized to `openai_compatible`.
 - If provider config is unsupported, `/ask` still returns 200 with `meta.llm_error`.
 
 ## Enrichment v2 runbook

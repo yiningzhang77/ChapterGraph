@@ -214,6 +214,44 @@ def test_ask_qwen_openai_compatible_supports_text_array_content(
     assert "Array answer" in answer
 
 
+def test_ask_qwen_normalizes_openai_compatible_alias(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(qwen_client, "CONFIG_PATH", Path("config/llm.env.missing"))
+    monkeypatch.setenv("QWEN_PROVIDER", "openai-compatible")
+    monkeypatch.setenv("QWEN_BASE_URL", "https://example.test")
+    monkeypatch.setenv("QWEN_API_KEY", "secret")
+    monkeypatch.setenv("QWEN_MODEL", "qwen-max")
+
+    def fake_urlopen(req: object, timeout: float) -> _FakeHttpResponse:
+        _ = (req, timeout)
+        return _FakeHttpResponse(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "## Findings\n- Alias answer\n\n## Citations\nspring::ch1"
+                        }
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(qwen_client.urllib_request, "urlopen", fake_urlopen)
+
+    answer = ask_qwen(
+        query="Actuator",
+        query_type="term",
+        cluster=_cluster(["spring::ch1"]),
+        retrieval_term="Actuator",
+        response_guidance=None,
+        model="qwen",
+        timeout_ms=5000,
+    )
+
+    assert "Alias answer" in answer
+
+
 def test_ask_qwen_openai_compatible_requires_base_url(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
