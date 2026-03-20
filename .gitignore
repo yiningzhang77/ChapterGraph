@@ -6,6 +6,10 @@ output
 frontend/graph-core-dist
 frontend/node_modules
 config/llm.env
+config/app.env
 /tmp
 book_epub/
 chatbot/
+agent-goal-03191912/
+runtime-03191902/
+deploy-health-03201609/
