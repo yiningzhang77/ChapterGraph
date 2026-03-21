@@ -1,0 +1,12 @@
+.git
+.pytest_cache
+.vscode
+__pycache__
+*.pyc
+tmp
+output
+book_epub
+frontend/node_modules
+frontend/graph-core-dist
+config/*.env
+
