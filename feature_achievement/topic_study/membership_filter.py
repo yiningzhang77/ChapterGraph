@@ -3,13 +3,20 @@ from __future__ import annotations
 import re
 from typing import Sequence
 
+from sqlmodel import Session, select
+
 from feature_achievement.db.models import EnrichedChapter
+from feature_achievement.topic_study.contracts import TopicCatalog
 from feature_achievement.topic_study.membership_contracts import (
+    RefinedTopicCatalog,
+    RefinedTopicDescriptor,
     TopicMembershipDecision,
 )
 
 __all__ = [
+    "build_refined_topic_catalog",
     "build_membership_decisions",
+    "detect_broad_topic",
     "score_membership_against_representative",
     "select_representative_chapter",
 ]
@@ -82,6 +89,100 @@ def build_membership_decisions(
     return representative, decisions
 
 
+def detect_broad_topic(
+    *,
+    decisions: Sequence[TopicMembershipDecision],
+) -> bool:
+    core_count = sum(1 for item in decisions if item.member_role == "core")
+    peripheral_count = sum(1 for item in decisions if item.member_role == "peripheral")
+    excluded_count = sum(1 for item in decisions if item.member_role == "excluded")
+    total = len(decisions)
+
+    if total >= 6 and peripheral_count >= 2:
+        return True
+    if total >= 6 and excluded_count >= 2:
+        return True
+    if total >= 5 and peripheral_count >= 2 and excluded_count >= 1:
+        return True
+    if total >= 6 and core_count <= max(2, total // 3):
+        return True
+    return False
+
+
+def build_refined_topic_catalog(
+    *,
+    session: Session,
+    topic_catalog: TopicCatalog,
+) -> RefinedTopicCatalog:
+    chapter_ids = sorted(
+        {
+            chapter_id
+            for topic in topic_catalog.topics
+            for chapter_id in topic.chapter_ids
+        }
+    )
+    chapter_by_id = _get_enriched_by_ids(
+        session=session,
+        chapter_ids=chapter_ids,
+        enrichment_version=topic_catalog.enrichment_version,
+    )
+
+    topics: list[RefinedTopicDescriptor] = []
+    for topic in topic_catalog.topics:
+        member_rows = [
+            chapter_by_id[chapter_id]
+            for chapter_id in topic.chapter_ids
+            if chapter_id in chapter_by_id
+        ]
+        if not member_rows:
+            continue
+
+        representative, decisions = build_membership_decisions(
+            topic_id=topic.topic_id,
+            rows=member_rows,
+        )
+        core_chapter_ids = [
+            item.chapter_id
+            for item in decisions
+            if item.member_role == "core"
+        ]
+        peripheral_chapter_ids = [
+            item.chapter_id
+            for item in decisions
+            if item.member_role == "peripheral"
+        ]
+        excluded_chapter_ids = [
+            item.chapter_id
+            for item in decisions
+            if item.member_role == "excluded"
+        ]
+        included_rows = [
+            chapter_by_id[chapter_id]
+            for chapter_id in core_chapter_ids + peripheral_chapter_ids
+            if chapter_id in chapter_by_id
+        ]
+        topics.append(
+            RefinedTopicDescriptor(
+                topic_id=topic.topic_id,
+                label=_topic_label(representative),
+                description=_topic_description(representative),
+                representative_chapter_id=representative.id,
+                core_chapter_ids=core_chapter_ids,
+                peripheral_chapter_ids=peripheral_chapter_ids,
+                excluded_chapter_ids=excluded_chapter_ids,
+                book_ids=_ordered_unique([row.book_id for row in included_rows]),
+                broad_topic_flag=detect_broad_topic(decisions=decisions),
+                membership_decisions=decisions,
+            )
+        )
+
+    return RefinedTopicCatalog(
+        run_id=topic_catalog.run_id,
+        enrichment_version=topic_catalog.enrichment_version,
+        topics=topics,
+    )
+
+
 def _representative_centrality(
     *,
     row: EnrichedChapter,
@@ -131,3 +232,46 @@ def _sort_order(value: int | None) -> int:
     if isinstance(value, int):
         return value
     return 10**9
+
+
+def _get_enriched_by_ids(
+    *,
+    session: Session,
+    chapter_ids: list[str],
+    enrichment_version: str,
+) -> dict[str, EnrichedChapter]:
+    if not chapter_ids:
+        return {}
+    stmt = (
+        select(EnrichedChapter)
+        .where(EnrichedChapter.enrichment_version == enrichment_version)
+        .where(EnrichedChapter.id.in_(chapter_ids))
+    )
+    rows = session.exec(stmt).all()
+    return {row.id: row for row in rows}
+
+
+def _topic_label(row: EnrichedChapter) -> str:
+    if isinstance(row.title, str) and row.title.strip():
+        return row.title.strip()
+    return row.id
+
+
+def _topic_description(row: EnrichedChapter) -> str | None:
+    text = row.chapter_index_text.strip()
+    if not text:
+        return None
+    if len(text) <= 240:
+        return text
+    return text[:237] + "..."
+
+
+def _ordered_unique(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        ordered.append(value)
+    return ordered
