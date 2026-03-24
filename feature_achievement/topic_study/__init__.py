@@ -16,6 +16,11 @@ from feature_achievement.topic_study.membership_contracts import (
     TopicMemberRole,
     TopicMembershipDecision,
 )
+from feature_achievement.topic_study.membership_filter import (
+    build_membership_decisions,
+    score_membership_against_representative,
+    select_representative_chapter,
+)
 
 __all__ = [
     "TopicCatalog",
@@ -26,6 +31,9 @@ __all__ = [
     "TopicMembershipDecision",
     "RefinedTopicDescriptor",
     "RefinedTopicCatalog",
+    "select_representative_chapter",
+    "score_membership_against_representative",
+    "build_membership_decisions",
     "TopicCandidateGroup",
     "build_topic_catalog",
     "build_topic_id",
