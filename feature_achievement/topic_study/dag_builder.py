@@ -2,14 +2,16 @@ from __future__ import annotations
 
 import re
 
-from feature_achievement.topic_study.dag_contracts import TopicRelation
+from feature_achievement.topic_study.dag_contracts import TopicDAG, TopicRelation
 from feature_achievement.topic_study.membership_contracts import (
     RefinedTopicCatalog,
     RefinedTopicDescriptor,
 )
 
 __all__ = [
+    "build_topic_dag",
     "infer_topic_relations",
+    "select_entry_topic_ids",
 ]
 
 FOUNDATIONAL_CUES = {
@@ -67,6 +69,58 @@ def infer_topic_relations(
             item.relation_type,
         ),
     )
+
+
+def build_topic_dag(
+    *,
+    catalog: RefinedTopicCatalog,
+) -> TopicDAG:
+    candidate_relations = infer_topic_relations(catalog=catalog)
+    relations = _prune_topic_relations(candidate_relations)
+    entry_topic_ids = select_entry_topic_ids(
+        topics=catalog.topics,
+        relations=relations,
+    )
+    return TopicDAG(
+        run_id=catalog.run_id,
+        enrichment_version=catalog.enrichment_version,
+        topics=sorted(catalog.topics, key=lambda item: item.topic_id),
+        relations=relations,
+        entry_topic_ids=entry_topic_ids,
+    )
+
+
+def select_entry_topic_ids(
+    *,
+    topics: list[RefinedTopicDescriptor],
+    relations: list[TopicRelation],
+) -> list[str]:
+    incoming_targets = {
+        relation.to_topic_id
+        for relation in relations
+        if relation.relation_type == "prerequisite"
+    }
+    root_topics = [
+        topic
+        for topic in topics
+        if not topic.broad_topic_flag and topic.topic_id not in incoming_targets
+    ]
+    if not root_topics:
+        root_topics = [topic for topic in topics if not topic.broad_topic_flag]
+    if not root_topics:
+        return []
+
+    ordered_roots = sorted(
+        root_topics,
+        key=lambda item: (
+            -_entry_score(item),
+            _topic_min_order(item),
+            item.topic_id,
+        ),
+    )
+    positive_roots = [topic for topic in ordered_roots if _entry_score(topic) > 0]
+    selected = positive_roots[:3] if positive_roots else ordered_roots[:3]
+    return [topic.topic_id for topic in selected]
 
 
 def _pick_directional_relation(
@@ -216,3 +270,88 @@ def _chapter_order(chapter_id: str) -> int | None:
 
 def _is_cross_book_topic(topic: RefinedTopicDescriptor) -> bool:
     return len(topic.book_ids) >= 2
+
+
+def _prune_topic_relations(
+    relations: list[TopicRelation],
+) -> list[TopicRelation]:
+    kept: list[TopicRelation] = []
+    incoming_count: dict[str, int] = {}
+    outgoing_count: dict[str, int] = {}
+
+    for relation in sorted(
+        relations,
+        key=lambda item: (
+            -(item.score or 0.0),
+            item.from_topic_id,
+            item.to_topic_id,
+        ),
+    ):
+        if relation.relation_type != "prerequisite":
+            continue
+        if incoming_count.get(relation.to_topic_id, 0) >= 1:
+            continue
+        if outgoing_count.get(relation.from_topic_id, 0) >= 3:
+            continue
+        if _would_create_cycle(
+            relations=kept,
+            source_id=relation.from_topic_id,
+            target_id=relation.to_topic_id,
+        ):
+            continue
+
+        kept.append(relation)
+        incoming_count[relation.to_topic_id] = incoming_count.get(relation.to_topic_id, 0) + 1
+        outgoing_count[relation.from_topic_id] = outgoing_count.get(relation.from_topic_id, 0) + 1
+
+    return sorted(
+        kept,
+        key=lambda item: (
+            item.from_topic_id,
+            item.to_topic_id,
+            item.relation_type,
+        ),
+    )
+
+
+def _would_create_cycle(
+    *,
+    relations: list[TopicRelation],
+    source_id: str,
+    target_id: str,
+) -> bool:
+    adjacency: dict[str, list[str]] = {}
+    for relation in relations:
+        adjacency.setdefault(relation.from_topic_id, []).append(relation.to_topic_id)
+
+    stack = [target_id]
+    visited: set[str] = set()
+    while stack:
+        current = stack.pop()
+        if current == source_id:
+            return True
+        if current in visited:
+            continue
+        visited.add(current)
+        stack.extend(adjacency.get(current, []))
+    return False
+
+
+def _entry_score(topic: RefinedTopicDescriptor) -> float:
+    score = float(_foundationality_score(topic))
+    if _is_cross_book_topic(topic):
+        score += 2.0
+    score -= _topic_min_order(topic) / 100.0
+    return score
+
+
+def _topic_min_order(topic: RefinedTopicDescriptor) -> int:
+    orders = [
+        _chapter_order(chapter_id)
+        for chapter_id in topic.core_chapter_ids + topic.peripheral_chapter_ids
+    ]
+    present_orders = [order for order in orders if isinstance(order, int)]
+    if not present_orders:
+        representative_order = _chapter_order(topic.representative_chapter_id)
+        return representative_order if isinstance(representative_order, int) else 10**9
+    return min(present_orders)
