@@ -31,7 +31,7 @@ test("findPreferredSuggestedTerm prefers data persistence style narrowing", () =
     assert.equal(findPreferredSuggestedTerm([]), null);
 });
 
-test("guided demo controller runs the main flow in order", async () => {
+test("guided demo controller advances step by step instead of auto-running everything", async () => {
     const state = {
         askMode: "term",
         askTerm: "",
@@ -48,6 +48,7 @@ test("guided demo controller runs the main flow in order", async () => {
         expandedBooks: new Set(),
     };
     const actionLog = [];
+    const statusLog = [];
 
     const controller = createGuidedDemoController({
         getState: () => state,
@@ -92,7 +93,14 @@ test("guided demo controller runs the main flow in order", async () => {
                 state.askLoading = false;
             },
         },
-        onStatusChange: () => {},
+        onStatusChange: (status) => {
+            statusLog.push({
+                running: status.guidedDemoRunning,
+                ready: status.guidedDemoReadyForNext,
+                phase: status.guidedDemoPhase,
+                stepIndex: status.guidedDemoStepIndex,
+            });
+        },
         onStepChange: () => {},
         onError: (message) => {
             throw new Error(message);
@@ -101,8 +109,21 @@ test("guided demo controller runs the main flow in order", async () => {
 
     await controller.start();
 
+    assert.deepEqual(actionLog, []);
+    assert.equal(controller.isReadyForNext(), true);
+
+    await controller.next();
+    await controller.next();
+    await controller.next();
+    await controller.next();
+    await controller.next();
+    await controller.next();
+    await controller.next();
+    await controller.next();
+
     assert.deepEqual(actionLog, [
         "expandAllBooks",
+        "setAskMode:term",
         "setAskMode:term",
         "setAskTerm:Actuator",
         "setAskQuery:请用中文说明它是什么，它主要解决什么问题",
@@ -115,4 +136,7 @@ test("guided demo controller runs the main flow in order", async () => {
         "setAskQuery:请继续用中文解释它在 Spring 里是怎么做的",
         "submitAsk:data persistence",
     ]);
+    assert.equal(controller.isReadyForNext(), false);
+    assert.ok(statusLog.some((entry) => entry.phase === "ready"));
+    assert.ok(statusLog.some((entry) => entry.phase === "finished"));
 });

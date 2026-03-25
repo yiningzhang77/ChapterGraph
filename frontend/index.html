@@ -5,7 +5,6 @@
     <meta charset="UTF-8" />
     <title>ChapterGraph</title>
     <script src="https://d3js.org/d3.v7.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shepherd.js@13.0.0/dist/css/shepherd.css">
     <script src="./runtime-config.js"></script>
     <style>
         :root {
@@ -88,6 +87,99 @@
             background: var(--panel);
             backdrop-filter: blur(8px);
             box-sizing: border-box;
+        }
+
+        #askPanel.demoLayout {
+            width: calc(50vw - 20px);
+            height: calc(100vh - 20px);
+            max-height: none;
+        }
+
+        .guidedDemoOverlay {
+            position: fixed;
+            top: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 40;
+            width: min(720px, calc(100vw - 32px));
+            border: 1px solid rgba(37, 99, 235, 0.24);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.96);
+            color: var(--text);
+            box-shadow: 0 18px 45px rgba(15, 23, 42, 0.16);
+            padding: 14px 16px;
+            box-sizing: border-box;
+            backdrop-filter: blur(8px);
+        }
+
+        .guidedDemoOverlayError {
+            border-color: rgba(220, 38, 38, 0.28);
+            background: rgba(255, 255, 255, 0.98);
+        }
+
+        .guidedDemoOverlayBadge {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 6px;
+        }
+
+        .guidedDemoOverlayTitle {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .guidedDemoOverlayPhase {
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0.82;
+            margin-bottom: 8px;
+        }
+
+        .guidedDemoOverlayText,
+        .guidedDemoOverlayAction {
+            font-size: 13px;
+            line-height: 1.55;
+        }
+
+        .guidedDemoOverlayAction {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(148, 163, 184, 0.22);
+            opacity: 0.82;
+        }
+
+        .guidedDemoOverlayActions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .guidedDemoOverlayBtn {
+            border: 1px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            font-family: inherit;
+            color: var(--text);
+        }
+
+        .guidedDemoOverlayBtn.primary {
+            background: rgba(37, 99, 235, 0.12);
+            border-color: rgba(37, 99, 235, 0.28);
+            color: var(--accent);
+        }
+
+        .guidedDemoOverlayBtn.secondary {
+            background: rgba(255, 255, 255, 0.78);
+        }
+
+        .guidedDemoOverlayBtn:disabled {
+            opacity: 0.6;
+            cursor: default;
         }
 
         .askHeader {
@@ -244,59 +336,6 @@
             line-height: 1.45;
         }
 
-        .guidedDemoStatus {
-            border: 1px solid rgba(37, 99, 235, 0.22);
-            border-radius: 8px;
-            padding: 8px 10px;
-            background: rgba(37, 99, 235, 0.06);
-            color: var(--text);
-            font-size: 12px;
-            line-height: 1.45;
-        }
-
-        .guidedDemoStatusTitle {
-            font-size: 11px;
-            font-weight: 700;
-            opacity: 0.85;
-            margin-bottom: 4px;
-        }
-
-        .guidedDemoStatusError {
-            border-color: rgba(220, 38, 38, 0.24);
-            background: rgba(220, 38, 38, 0.08);
-            color: var(--error);
-        }
-
-        .guidedDemoStatusActions {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-        }
-
-        .guidedDemoStatusBtn {
-            border: 1px solid var(--panel-border);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.78);
-            color: var(--text);
-            padding: 6px 8px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-
-        :root[data-theme="dark"] .guidedDemoStatus {
-            background: rgba(96, 165, 250, 0.1);
-            border-color: rgba(96, 165, 250, 0.2);
-        }
-
-        :root[data-theme="dark"] .guidedDemoStatusError {
-            background: rgba(248, 113, 113, 0.12);
-            border-color: rgba(248, 113, 113, 0.18);
-        }
-
-        :root[data-theme="dark"] .guidedDemoStatusBtn {
-            background: rgba(15, 23, 42, 0.5);
-        }
-
         .askMessages {
             border: 1px solid var(--panel-border);
             border-radius: 8px;
@@ -308,6 +347,12 @@
             flex-direction: column;
             gap: 8px;
             background: rgba(255, 255, 255, 0.55);
+        }
+
+        #askPanel.demoLayout .askMessages {
+            flex: 1;
+            min-height: 0;
+            max-height: none;
         }
 
         :root[data-theme="dark"] .askMessages {
@@ -343,8 +388,54 @@
         .askText {
             font-size: 12px;
             line-height: 1.5;
-            white-space: pre-wrap;
             word-break: break-word;
+        }
+
+        .askText.userText {
+            white-space: pre-wrap;
+        }
+
+        .askText.markdown p {
+            margin: 0 0 10px;
+        }
+
+        .askText.markdown p:last-child {
+            margin-bottom: 0;
+        }
+
+        .askText.markdown ul,
+        .askText.markdown ol {
+            margin: 0 0 10px 18px;
+            padding: 0;
+        }
+
+        .askText.markdown li {
+            margin-bottom: 4px;
+        }
+
+        .askText.markdown code {
+            background: rgba(15, 23, 42, 0.08);
+            border-radius: 6px;
+            padding: 1px 5px;
+            font-family: Consolas, Monaco, monospace;
+            font-size: 12px;
+        }
+
+        .askText.markdown pre {
+            margin: 0 0 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            overflow: auto;
+            background: rgba(15, 23, 42, 0.08);
+        }
+
+        .askText.markdown pre code {
+            background: transparent;
+            padding: 0;
+        }
+
+        .askText.markdown strong {
+            font-weight: 700;
         }
 
         .askWarning {
@@ -415,6 +506,31 @@
             border-color: rgba(96, 165, 250, 0.22);
         }
 
+        :root[data-theme="dark"] .guidedDemoOverlay {
+            background: rgba(15, 23, 42, 0.95);
+            border-color: rgba(96, 165, 250, 0.26);
+            box-shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+        }
+
+        :root[data-theme="dark"] .guidedDemoOverlayError {
+            border-color: rgba(248, 113, 113, 0.26);
+        }
+
+        :root[data-theme="dark"] .guidedDemoOverlayBtn.primary {
+            background: rgba(96, 165, 250, 0.16);
+            border-color: rgba(96, 165, 250, 0.28);
+            color: #bfdbfe;
+        }
+
+        :root[data-theme="dark"] .guidedDemoOverlayBtn.secondary {
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        :root[data-theme="dark"] .askText.markdown code,
+        :root[data-theme="dark"] .askText.markdown pre {
+            background: rgba(2, 6, 23, 0.5);
+        }
+
         @media (max-width: 900px) {
             #topbar {
                 max-width: calc(100vw - 20px);
@@ -428,8 +544,20 @@
                 bottom: 10px;
             }
 
+            #askPanel.demoLayout {
+                width: calc(100vw - 20px);
+                height: 52vh;
+                top: auto;
+                bottom: 10px;
+            }
+
             .askMessages {
                 max-height: 20vh;
+            }
+
+            .guidedDemoOverlay {
+                top: 56px;
+                width: calc(100vw - 20px);
             }
         }
     </style>

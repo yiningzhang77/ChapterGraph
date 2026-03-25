@@ -1,5 +1,7 @@
 import React, { useEffect, useReducer, useRef, useState } from "https://esm.sh/react@18.2.0";
 import ReactDOM from "https://esm.sh/react-dom@18.2.0/client";
+import { marked } from "https://esm.sh/marked@15.0.12";
+import DOMPurify from "https://esm.sh/dompurify@3.2.6";
 import {
     rebuildGraph,
     draw,
@@ -11,11 +13,12 @@ import {
     updateSessionHitHistory,
 } from "./askHitMap.js";
 import {
+    GUIDED_DEMO_MIN_STEP_PAUSE_MS,
     GUIDED_DEMO_STEP_DETAILS,
     GUIDED_DEMO_STEP_ORDER,
     createGuidedDemoController,
 } from "./guidedDemo.js";
-import { createGuidedDemoTour } from "./guidedDemoTour.js";
+import { renderGuidedDemoOverlay } from "./guidedDemoOverlay.js";
 import { reducer as coreReducer } from "./graph-core-dist/reducer.js";
 
 function resolveApiBaseUrl() {
@@ -42,6 +45,18 @@ function resolveApiBaseUrl() {
 
 const API = resolveApiBaseUrl();
 const h = React.createElement;
+
+marked.setOptions({
+    gfm: true,
+    breaks: true,
+});
+
+function renderMarkdownToHtml(markdownText) {
+    if (typeof markdownText !== "string" || !markdownText.trim()) {
+        return "";
+    }
+    return DOMPurify.sanitize(marked.parse(markdownText));
+}
 
 function createInitialState() {
     return {
@@ -71,8 +86,12 @@ function App() {
     const [selectedChapter, setSelectedChapter] = useState(null);
     const [sessionHitHistory, setSessionHitHistory] = useState({});
     const [guidedDemoActive, setGuidedDemoActive] = useState(false);
+    const [guidedDemoLayoutActive, setGuidedDemoLayoutActive] = useState(false);
     const [guidedDemoRunning, setGuidedDemoRunning] = useState(false);
+    const [guidedDemoReadyForNext, setGuidedDemoReadyForNext] = useState(false);
     const [guidedDemoStep, setGuidedDemoStep] = useState("intro");
+    const [guidedDemoPhase, setGuidedDemoPhase] = useState("idle");
+    const [guidedDemoStepIndex, setGuidedDemoStepIndex] = useState(0);
     const [guidedDemoError, setGuidedDemoError] = useState("");
     const [state, dispatch] = useReducer(
         (currentState, action) => {
@@ -87,10 +106,10 @@ function App() {
     const canvasRef = useRef(null);
     const tooltipRef = useRef(null);
     const guidedDemoControllerRef = useRef(null);
-    const guidedDemoTourRef = useRef(null);
     const appSnapshotRef = useRef(null);
     const submitAskRef = useRef(null);
     const applySuggestedTermRef = useRef(null);
+    const askMessagesRef = useRef(null);
 
     useEffect(() => {
         stateRef.current = state;
@@ -121,6 +140,14 @@ function App() {
         state.expandedBooks,
         selectedChapter,
     ]);
+
+    useEffect(() => {
+        const container = askMessagesRef.current;
+        if (!container) {
+            return;
+        }
+        container.scrollTop = container.scrollHeight;
+    }, [messages.length]);
 
     useEffect(() => {
         document.documentElement.dataset.theme =
@@ -398,7 +425,7 @@ function App() {
         setAskMode("term");
         setAskTerm(termValue);
         setAskError("");
-        setNarrowingHint(`Term updated to ${termValue}. Review the question and send again.`);
+        setNarrowingHint(`术语已切换为 ${termValue}。你可以直接继续发送当前问题。`);
     };
 
     const expandAllBooks = () => {
@@ -424,15 +451,15 @@ function App() {
         const query = askQuery.trim();
         const term = askTerm.trim();
         if (!selectedRun) {
-            setAskError("Please select a run first.");
+            setAskError("请先选择一个 run。");
             return;
         }
         if (askMode === "term" && !term) {
-            setAskError("Please enter a term.");
+            setAskError("请输入一个术语。");
             return;
         }
         if (askMode === "chapter" && !selectedChapter?.chapterId) {
-            setAskError("Please click a chapter node before chapter ask.");
+            setAskError("请先点击一个章节节点，再使用章节问答。");
             return;
         }
 
@@ -551,10 +578,21 @@ function App() {
             },
             onStatusChange: (nextStatus) => {
                 if (Object.prototype.hasOwnProperty.call(nextStatus, "guidedDemoActive")) {
-                    setGuidedDemoActive(Boolean(nextStatus.guidedDemoActive));
+                    const nextActive = Boolean(nextStatus.guidedDemoActive);
+                    setGuidedDemoActive(nextActive);
+                    setGuidedDemoLayoutActive(nextActive);
                 }
                 if (Object.prototype.hasOwnProperty.call(nextStatus, "guidedDemoRunning")) {
                     setGuidedDemoRunning(Boolean(nextStatus.guidedDemoRunning));
+                }
+                if (Object.prototype.hasOwnProperty.call(nextStatus, "guidedDemoReadyForNext")) {
+                    setGuidedDemoReadyForNext(Boolean(nextStatus.guidedDemoReadyForNext));
+                }
+                if (typeof nextStatus.guidedDemoPhase === "string") {
+                    setGuidedDemoPhase(nextStatus.guidedDemoPhase);
+                }
+                if (typeof nextStatus.guidedDemoStepIndex === "number") {
+                    setGuidedDemoStepIndex(nextStatus.guidedDemoStepIndex);
                 }
                 if (typeof nextStatus.guidedDemoError === "string") {
                     setGuidedDemoError(nextStatus.guidedDemoError);
@@ -572,34 +610,6 @@ function App() {
         });
     }, []);
 
-    useEffect(() => {
-        if (!guidedDemoActive) {
-            guidedDemoTourRef.current?.cancel();
-            guidedDemoTourRef.current = null;
-            return;
-        }
-
-        const tour = createGuidedDemoTour({
-            onCancel: () => {
-                guidedDemoControllerRef.current?.stop();
-            },
-        });
-        guidedDemoTourRef.current = tour;
-        tour.start(guidedDemoStep);
-
-        return () => {
-            guidedDemoTourRef.current?.cancel();
-            guidedDemoTourRef.current = null;
-        };
-    }, [guidedDemoActive]);
-
-    useEffect(() => {
-        if (!guidedDemoActive || !guidedDemoTourRef.current) {
-            return;
-        }
-        guidedDemoTourRef.current.show(guidedDemoStep);
-    }, [guidedDemoActive, guidedDemoStep]);
-
     const startGuidedDemo = async () => {
         setGuidedDemoError("");
         await guidedDemoControllerRef.current?.start();
@@ -609,14 +619,37 @@ function App() {
         guidedDemoControllerRef.current?.stop();
     };
 
+    const restartGuidedDemo = async () => {
+        setGuidedDemoError("");
+        await guidedDemoControllerRef.current?.restart();
+    };
+
+    const nextGuidedDemoStep = async () => {
+        await guidedDemoControllerRef.current?.next();
+    };
+
     const askHeaderText = askMode === "chapter"
-        ? "Chapter Ask"
-        : "Term Ask";
+        ? "章节问答"
+        : "术语问答";
     const guidedDemoStepDetails = GUIDED_DEMO_STEP_DETAILS[guidedDemoStep] ?? null;
-    const guidedDemoStepIndex = Math.max(0, GUIDED_DEMO_STEP_ORDER.indexOf(guidedDemoStep));
+    const currentGuidedDemoStepIndex = Math.max(0, guidedDemoStepIndex);
+    const guidedDemoPauseSeconds = Math.round(GUIDED_DEMO_MIN_STEP_PAUSE_MS / 1000);
 
     return (
         h(React.Fragment, null,
+            renderGuidedDemoOverlay(h, {
+                active: guidedDemoActive,
+                stepDetails: guidedDemoStepDetails,
+                stepIndex: currentGuidedDemoStepIndex,
+                totalSteps: GUIDED_DEMO_STEP_ORDER.length,
+                isRunning: guidedDemoRunning,
+                readyForNext: guidedDemoReadyForNext,
+                phase: guidedDemoPhase,
+                error: guidedDemoError,
+                onNext: nextGuidedDemoStep,
+                onStop: stopGuidedDemo,
+                onRestart: restartGuidedDemo,
+            }),
             h("div", { id: "topbar" },
                 h(
                     "select",
@@ -642,73 +675,28 @@ function App() {
             ),
             h("canvas", { id: "graph", ref: canvasRef }),
             h("div", { id: "tooltip", ref: tooltipRef }),
-            h("aside", { id: "askPanel" },
+            h("aside", {
+                id: "askPanel",
+                className: guidedDemoLayoutActive ? "demoLayout" : "",
+            },
                 h("div", { className: "askHeader" }, askHeaderText),
                 h(
                     "button",
                     {
                         id: "guidedDemoTrigger",
                         type: "button",
-                        className: guidedDemoRunning ? "guidedDemoBtn running" : "guidedDemoBtn",
-                        onClick: guidedDemoRunning ? stopGuidedDemo : startGuidedDemo,
+                        className: guidedDemoActive ? "guidedDemoBtn running" : "guidedDemoBtn",
+                        onClick: guidedDemoActive ? restartGuidedDemo : startGuidedDemo,
                     },
-                    guidedDemoRunning
-                        ? "Stop Guided Demo"
-                        : guidedDemoActive
-                            ? "Restart Guided Demo"
-                            : "✨ Guided Demo",
+                    guidedDemoActive ? "重新开始回放" : "回放演示（逐步）",
                 ),
                 guidedDemoActive
                     ? h(
                         "div",
-                        {
-                            className: guidedDemoError
-                                ? "guidedDemoStatus guidedDemoStatusError"
-                                : "guidedDemoStatus",
-                        },
-                        h(
-                            "div",
-                            { className: "guidedDemoStatusTitle" },
-                            guidedDemoStepDetails?.title
-                                ? `Guided Demo · ${guidedDemoStepDetails.title}`
-                                : "Guided Demo",
-                        ),
-                        h(
-                            "div",
-                            null,
-                            `Step ${guidedDemoStepIndex + 1} / ${GUIDED_DEMO_STEP_ORDER.length}`,
-                        ),
-                        guidedDemoError
-                            ? h("div", null, guidedDemoError)
-                            : h(
-                                "div",
-                                null,
-                                guidedDemoStepDetails?.text ?? "Running guided demo...",
-                            ),
-                        h(
-                            "div",
-                            { className: "guidedDemoStatusActions" },
-                            h(
-                                "button",
-                                {
-                                    type: "button",
-                                    className: "guidedDemoStatusBtn",
-                                    onClick: stopGuidedDemo,
-                                },
-                                "Stop",
-                            ),
-                            !guidedDemoRunning
-                                ? h(
-                                    "button",
-                                    {
-                                        type: "button",
-                                        className: "guidedDemoStatusBtn",
-                                        onClick: startGuidedDemo,
-                                    },
-                                    guidedDemoError ? "Retry" : "Restart",
-                                )
-                                : null,
-                        ),
+                        { className: "askHint" },
+                        guidedDemoRunning
+                            ? `当前步骤正在自动执行。每一步完成后会停顿约 ${guidedDemoPauseSeconds} 秒，再由你点击“下一步”继续。`
+                            : "当前处于演示回放模式。你只需要点击顶部气泡里的“下一步”继续。",
                     )
                     : null,
                 h("div", { className: "askModeRow" },
@@ -720,7 +708,7 @@ function App() {
                             className: askMode === "term" ? "askModeBtn active" : "askModeBtn",
                             onClick: () => setAskMode("term"),
                         },
-                        "Ask by Term",
+                        "按术语提问",
                     ),
                     h(
                         "button",
@@ -730,7 +718,7 @@ function App() {
                             className: askMode === "chapter" ? "askModeBtn active" : "askModeBtn",
                             onClick: () => setAskMode("chapter"),
                         },
-                        "Ask by Chapter",
+                        "按章节提问",
                     ),
                 ),
                 askMode === "chapter"
@@ -742,13 +730,13 @@ function App() {
                                 : "askSelectedChapter hint",
                         },
                         selectedChapter
-                            ? `Selected chapter: ${selectedChapter.chapterId} (${selectedChapter.bookId})`
-                            : "Hint: click a chapter node on the graph first.",
+                            ? `已选章节：${selectedChapter.chapterId} (${selectedChapter.bookId})`
+                            : "提示：请先在左侧图里点击一个章节节点。",
                     )
                     : null,
                 askMode === "term"
                     ? h(React.Fragment, null,
-                        h("div", { className: "askFieldLabel" }, "Term"),
+                        h("div", { className: "askFieldLabel" }, "术语"),
                         h("input", {
                             id: "guidedDemoTermInput",
                             className: "askFieldInput",
@@ -763,14 +751,14 @@ function App() {
                 h(
                     "div",
                     { className: "askFieldLabel" },
-                    askMode === "chapter" ? "Question (Optional)" : "Ask About This Term (Optional)",
+                    askMode === "chapter" ? "问题（可选）" : "围绕这个术语继续提问（可选）",
                 ),
                 h("textarea", {
                     id: "guidedDemoQueryInput",
                     className: "askInput",
                     placeholder: askMode === "chapter"
-                        ? "Ask about the selected chapter..."
-                        : "Ask a specific question about this term...",
+                        ? "继续追问这个章节..."
+                        : "继续追问这个术语...",
                     value: askQuery,
                     onChange: (e) => setAskQuery(e.target.value),
                     disabled: askLoading,
@@ -784,15 +772,15 @@ function App() {
                         onClick: onAskSubmit,
                         disabled: askLoading,
                     },
-                    askLoading ? "Asking..." : "Send",
+                    askLoading ? "正在提问..." : "发送",
                 ),
                 askError ? h("div", { className: "askError" }, askError) : null,
                 narrowingHint ? h("div", { className: "askHint" }, narrowingHint) : null,
                 h(
                     "div",
-                    { id: "guidedDemoMessages", className: "askMessages" },
+                    { id: "guidedDemoMessages", className: "askMessages", ref: askMessagesRef },
                     messages.length === 0
-                        ? h("div", { className: "askEmpty" }, "No messages yet.")
+                        ? h("div", { className: "askEmpty" }, "还没有消息。")
                         : messages.map((message, index) =>
                             h(
                                 "div",
@@ -804,10 +792,10 @@ function App() {
                                     "div",
                                     { className: "askMeta" },
                                     message.role === "assistant"
-                                        ? "assistant"
+                                        ? "系统回答"
                                         : message.queryType === "chapter"
-                                            ? `chapter ${message.chapterId ?? ""}`.trim()
-                                            : `term ${message.term ?? ""}`.trim(),
+                                            ? `章节 ${message.chapterId ?? ""}`.trim()
+                                            : `术语 ${message.term ?? ""}`.trim(),
                                 ),
                                 message.role === "assistant"
                                     && message.warningMessage
@@ -831,7 +819,7 @@ function App() {
                                             className: "askSuggestions",
                                             "data-demo-role": "suggestions",
                                         },
-                                        h("div", { className: "askSuggestionsLabel" }, "Try:"),
+                                        h("div", { className: "askSuggestionsLabel" }, "推荐继续追问："),
                                         h(
                                             "div",
                                             { className: "askSuggestionList" },
@@ -851,7 +839,14 @@ function App() {
                                     )
                                     : null,
                                 message.text
-                                    ? h("div", { className: "askText" }, message.text)
+                                    ? message.role === "assistant"
+                                        ? h("div", {
+                                            className: "askText markdown",
+                                            dangerouslySetInnerHTML: {
+                                                __html: renderMarkdownToHtml(message.text),
+                                            },
+                                        })
+                                        : h("div", { className: "askText userText" }, message.text)
                                     : null,
                             ),
                         ),
