@@ -1,5 +1,6 @@
 import os
 import json
+import socket
 from pathlib import Path
 from urllib import error as urllib_error
 from urllib import request as urllib_request
@@ -167,6 +168,14 @@ def _ask_openai_compatible(
     try:
         with urllib_request.urlopen(req, timeout=timeout_seconds) as response:
             response_body = response.read().decode("utf-8")
+    except TimeoutError as exc:
+        raise RuntimeError(
+            f"LLM provider request timed out after {timeout_seconds:.1f}s"
+        ) from exc
+    except socket.timeout as exc:
+        raise RuntimeError(
+            f"LLM provider request timed out after {timeout_seconds:.1f}s"
+        ) from exc
     except urllib_error.HTTPError as exc:
         error_body = exc.read().decode("utf-8", errors="replace").strip()
         detail = error_body or exc.reason or "HTTP error"
@@ -174,6 +183,14 @@ def _ask_openai_compatible(
             f"LLM provider request failed ({exc.code}): {detail}"
         ) from exc
     except urllib_error.URLError as exc:
+        if isinstance(exc.reason, TimeoutError):
+            raise RuntimeError(
+                f"LLM provider request timed out after {timeout_seconds:.1f}s"
+            ) from exc
+        if isinstance(exc.reason, socket.timeout):
+            raise RuntimeError(
+                f"LLM provider request timed out after {timeout_seconds:.1f}s"
+            ) from exc
         reason = str(exc.reason) if exc.reason else "network error"
         raise RuntimeError(f"LLM provider request failed: {reason}") from exc
 

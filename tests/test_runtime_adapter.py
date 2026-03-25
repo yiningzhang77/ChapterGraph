@@ -11,7 +11,7 @@ def test_to_runtime_request_maps_term_request_fields() -> None:
         enrichment_version="v2_indexed_sections_bullets",
         llm_enabled=True,
         llm_model="qwen",
-        llm_timeout_ms=20_000,
+        llm_timeout_ms=60_000,
         return_cluster=True,
         return_graph_fragment=False,
     )

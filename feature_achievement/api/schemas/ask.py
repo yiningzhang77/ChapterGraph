@@ -19,7 +19,7 @@ class AskRequest(BaseModel):
     min_edge_score: float = Field(0.2, ge=0.0, le=1.0)
     llm_enabled: bool = True
     llm_model: str = "qwen"
-    llm_timeout_ms: int = Field(20000, ge=1000, le=120000)
+    llm_timeout_ms: int = Field(60000, ge=1000, le=120000)
     return_cluster: bool = True
     return_graph_fragment: bool = True
 

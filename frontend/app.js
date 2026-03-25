@@ -425,8 +425,13 @@ function App() {
             const suggestedTerms = warnings && Array.isArray(warnings.suggested_terms)
                 ? warnings.suggested_terms.filter((value) => typeof value === "string")
                 : [];
+            const llmError = meta && typeof meta.llm_error === "string"
+                ? meta.llm_error
+                : "";
             const answer = typeof result.answer_markdown === "string" && result.answer_markdown.trim()
                 ? result.answer_markdown
+                : llmError
+                    ? `LLM request failed: ${llmError}`
                 : responseState === "needs_narrower_term"
                     ? ""
                     : "No answer returned from /ask.";

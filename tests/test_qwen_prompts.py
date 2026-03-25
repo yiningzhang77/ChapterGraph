@@ -1,6 +1,7 @@
 from pathlib import Path
 import io
 import json
+import socket
 
 import pytest
 
@@ -305,6 +306,35 @@ def test_ask_qwen_openai_compatible_surfaces_http_error(
             model="qwen",
             timeout_ms=5000,
         )
+
+
+def test_ask_qwen_openai_compatible_surfaces_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(qwen_client, "CONFIG_PATH", Path("config/llm.env.missing"))
+    monkeypatch.setenv("QWEN_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("QWEN_BASE_URL", "https://example.test")
+    monkeypatch.setenv("QWEN_API_KEY", "secret")
+    monkeypatch.setenv("QWEN_MODEL", "qwen-max")
+
+    def fake_urlopen(req: object, timeout: float) -> _FakeHttpResponse:
+        _ = (req, timeout)
+        raise socket.timeout("timed out")
+
+    monkeypatch.setattr(qwen_client.urllib_request, "urlopen", fake_urlopen)
+
+    with pytest.raises(RuntimeError) as exc:
+        ask_qwen(
+            query="Actuator",
+            query_type="term",
+            cluster=_cluster(["spring::ch1"]),
+            retrieval_term="Actuator",
+            response_guidance=None,
+            model="qwen",
+            timeout_ms=5000,
+        )
+
+    assert "timed out after 5.0s" in str(exc.value)
 
 
 def test_build_prompt_includes_response_guidance_when_present() -> None:
