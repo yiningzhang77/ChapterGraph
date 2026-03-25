@@ -10,6 +10,9 @@ from feature_achievement.topic_study.discovery import (
     build_topic_id,
     group_topic_candidates,
 )
+from feature_achievement.topic_study.dag_builder import (
+    infer_topic_relations,
+)
 from feature_achievement.topic_study.dag_contracts import (
     TopicDAG,
     TopicRelation,
@@ -41,6 +44,7 @@ __all__ = [
     "TopicRelationType",
     "TopicRelation",
     "TopicDAG",
+    "infer_topic_relations",
     "build_refined_topic_catalog",
     "select_representative_chapter",
     "score_membership_against_representative",
