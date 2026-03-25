@@ -10,6 +10,12 @@ import {
     mergeAskHitWithSessionHistory,
     updateSessionHitHistory,
 } from "./askHitMap.js";
+import {
+    GUIDED_DEMO_STEP_DETAILS,
+    GUIDED_DEMO_STEP_ORDER,
+    createGuidedDemoController,
+} from "./guidedDemo.js";
+import { createGuidedDemoTour } from "./guidedDemoTour.js";
 import { reducer as coreReducer } from "./graph-core-dist/reducer.js";
 
 function resolveApiBaseUrl() {
@@ -64,6 +70,10 @@ function App() {
     const [askLoading, setAskLoading] = useState(false);
     const [selectedChapter, setSelectedChapter] = useState(null);
     const [sessionHitHistory, setSessionHitHistory] = useState({});
+    const [guidedDemoActive, setGuidedDemoActive] = useState(false);
+    const [guidedDemoRunning, setGuidedDemoRunning] = useState(false);
+    const [guidedDemoStep, setGuidedDemoStep] = useState("intro");
+    const [guidedDemoError, setGuidedDemoError] = useState("");
     const [state, dispatch] = useReducer(
         (currentState, action) => {
             const partial = coreReducer(currentState, action);
@@ -76,10 +86,41 @@ function App() {
     const simulationRef = useRef(null);
     const canvasRef = useRef(null);
     const tooltipRef = useRef(null);
+    const guidedDemoControllerRef = useRef(null);
+    const guidedDemoTourRef = useRef(null);
+    const appSnapshotRef = useRef(null);
+    const submitAskRef = useRef(null);
+    const applySuggestedTermRef = useRef(null);
 
     useEffect(() => {
         stateRef.current = state;
     }, [state]);
+
+    useEffect(() => {
+        appSnapshotRef.current = {
+            selectedRun,
+            askMode,
+            askTerm,
+            askQuery,
+            askLoading,
+            messages,
+            askHitMap: state.askHitMap,
+            graph: state.graph,
+            expandedBooks: state.expandedBooks,
+            selectedChapter,
+        };
+    }, [
+        selectedRun,
+        askMode,
+        askTerm,
+        askQuery,
+        askLoading,
+        messages,
+        state.askHitMap,
+        state.graph,
+        state.expandedBooks,
+        selectedChapter,
+    ]);
 
     useEffect(() => {
         document.documentElement.dataset.theme =
@@ -360,7 +401,26 @@ function App() {
         setNarrowingHint(`Term updated to ${termValue}. Review the question and send again.`);
     };
 
-    const onAskSubmit = async () => {
+    const expandAllBooks = () => {
+        const graph = stateRef.current.graph;
+        if (!graph || !Array.isArray(graph.nodes)) {
+            return;
+        }
+        const alreadyExpanded = stateRef.current.expandedBooks;
+        graph.nodes
+            .filter((node) => node && node.type === "book" && typeof node.id === "string")
+            .forEach((bookNode) => {
+                if (alreadyExpanded.has(bookNode.id)) {
+                    return;
+                }
+                dispatch({
+                    type: "TOGGLE_BOOK",
+                    bookId: bookNode.id,
+                });
+            });
+    };
+
+    const submitAsk = async () => {
         const query = askQuery.trim();
         const term = askTerm.trim();
         if (!selectedRun) {
@@ -465,9 +525,95 @@ function App() {
         }
     };
 
+    const onAskSubmit = async () => {
+        await submitAsk();
+    };
+    submitAskRef.current = submitAsk;
+    applySuggestedTermRef.current = onSuggestedTermClick;
+
+    useEffect(() => {
+        guidedDemoControllerRef.current = createGuidedDemoController({
+            getState: () => appSnapshotRef.current ?? {
+                messages: [],
+                askLoading: false,
+                askHitMap: {},
+                graph: null,
+                expandedBooks: new Set(),
+            },
+            actions: {
+                sleep: (ms) => new Promise((resolve) => window.setTimeout(resolve, ms)),
+                setAskMode: (mode) => setAskMode(mode),
+                setAskTerm: (value) => setAskTerm(value),
+                setAskQuery: (value) => setAskQuery(value),
+                submitAsk: () => submitAskRef.current?.(),
+                applySuggestedTerm: (value) => applySuggestedTermRef.current?.(value),
+                expandAllBooks,
+            },
+            onStatusChange: (nextStatus) => {
+                if (Object.prototype.hasOwnProperty.call(nextStatus, "guidedDemoActive")) {
+                    setGuidedDemoActive(Boolean(nextStatus.guidedDemoActive));
+                }
+                if (Object.prototype.hasOwnProperty.call(nextStatus, "guidedDemoRunning")) {
+                    setGuidedDemoRunning(Boolean(nextStatus.guidedDemoRunning));
+                }
+                if (typeof nextStatus.guidedDemoError === "string") {
+                    setGuidedDemoError(nextStatus.guidedDemoError);
+                }
+            },
+            onStepChange: (stepId) => {
+                if (typeof stepId === "string") {
+                    setGuidedDemoStep(stepId);
+                    setGuidedDemoError("");
+                }
+            },
+            onError: (message) => {
+                setGuidedDemoError(message);
+            },
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!guidedDemoActive) {
+            guidedDemoTourRef.current?.cancel();
+            guidedDemoTourRef.current = null;
+            return;
+        }
+
+        const tour = createGuidedDemoTour({
+            onCancel: () => {
+                guidedDemoControllerRef.current?.stop();
+            },
+        });
+        guidedDemoTourRef.current = tour;
+        tour.start(guidedDemoStep);
+
+        return () => {
+            guidedDemoTourRef.current?.cancel();
+            guidedDemoTourRef.current = null;
+        };
+    }, [guidedDemoActive]);
+
+    useEffect(() => {
+        if (!guidedDemoActive || !guidedDemoTourRef.current) {
+            return;
+        }
+        guidedDemoTourRef.current.show(guidedDemoStep);
+    }, [guidedDemoActive, guidedDemoStep]);
+
+    const startGuidedDemo = async () => {
+        setGuidedDemoError("");
+        await guidedDemoControllerRef.current?.start();
+    };
+
+    const stopGuidedDemo = () => {
+        guidedDemoControllerRef.current?.stop();
+    };
+
     const askHeaderText = askMode === "chapter"
         ? "Chapter Ask"
         : "Term Ask";
+    const guidedDemoStepDetails = GUIDED_DEMO_STEP_DETAILS[guidedDemoStep] ?? null;
+    const guidedDemoStepIndex = Math.max(0, GUIDED_DEMO_STEP_ORDER.indexOf(guidedDemoStep));
 
     return (
         h(React.Fragment, null,
@@ -498,10 +644,78 @@ function App() {
             h("div", { id: "tooltip", ref: tooltipRef }),
             h("aside", { id: "askPanel" },
                 h("div", { className: "askHeader" }, askHeaderText),
+                h(
+                    "button",
+                    {
+                        id: "guidedDemoTrigger",
+                        type: "button",
+                        className: guidedDemoRunning ? "guidedDemoBtn running" : "guidedDemoBtn",
+                        onClick: guidedDemoRunning ? stopGuidedDemo : startGuidedDemo,
+                    },
+                    guidedDemoRunning
+                        ? "Stop Guided Demo"
+                        : guidedDemoActive
+                            ? "Restart Guided Demo"
+                            : "✨ Guided Demo",
+                ),
+                guidedDemoActive
+                    ? h(
+                        "div",
+                        {
+                            className: guidedDemoError
+                                ? "guidedDemoStatus guidedDemoStatusError"
+                                : "guidedDemoStatus",
+                        },
+                        h(
+                            "div",
+                            { className: "guidedDemoStatusTitle" },
+                            guidedDemoStepDetails?.title
+                                ? `Guided Demo · ${guidedDemoStepDetails.title}`
+                                : "Guided Demo",
+                        ),
+                        h(
+                            "div",
+                            null,
+                            `Step ${guidedDemoStepIndex + 1} / ${GUIDED_DEMO_STEP_ORDER.length}`,
+                        ),
+                        guidedDemoError
+                            ? h("div", null, guidedDemoError)
+                            : h(
+                                "div",
+                                null,
+                                guidedDemoStepDetails?.text ?? "Running guided demo...",
+                            ),
+                        h(
+                            "div",
+                            { className: "guidedDemoStatusActions" },
+                            h(
+                                "button",
+                                {
+                                    type: "button",
+                                    className: "guidedDemoStatusBtn",
+                                    onClick: stopGuidedDemo,
+                                },
+                                "Stop",
+                            ),
+                            !guidedDemoRunning
+                                ? h(
+                                    "button",
+                                    {
+                                        type: "button",
+                                        className: "guidedDemoStatusBtn",
+                                        onClick: startGuidedDemo,
+                                    },
+                                    guidedDemoError ? "Retry" : "Restart",
+                                )
+                                : null,
+                        ),
+                    )
+                    : null,
                 h("div", { className: "askModeRow" },
                     h(
                         "button",
                         {
+                            "data-demo-role": "ask-mode-term",
                             type: "button",
                             className: askMode === "term" ? "askModeBtn active" : "askModeBtn",
                             onClick: () => setAskMode("term"),
@@ -511,6 +725,7 @@ function App() {
                     h(
                         "button",
                         {
+                            "data-demo-role": "ask-mode-chapter",
                             type: "button",
                             className: askMode === "chapter" ? "askModeBtn active" : "askModeBtn",
                             onClick: () => setAskMode("chapter"),
@@ -535,6 +750,7 @@ function App() {
                     ? h(React.Fragment, null,
                         h("div", { className: "askFieldLabel" }, "Term"),
                         h("input", {
+                            id: "guidedDemoTermInput",
                             className: "askFieldInput",
                             type: "text",
                             placeholder: "Actuator / JdbcTemplate / data persistence",
@@ -550,6 +766,7 @@ function App() {
                     askMode === "chapter" ? "Question (Optional)" : "Ask About This Term (Optional)",
                 ),
                 h("textarea", {
+                    id: "guidedDemoQueryInput",
                     className: "askInput",
                     placeholder: askMode === "chapter"
                         ? "Ask about the selected chapter..."
@@ -561,6 +778,7 @@ function App() {
                 h(
                     "button",
                     {
+                        id: "guidedDemoSubmit",
                         type: "button",
                         className: "askSubmit",
                         onClick: onAskSubmit,
@@ -572,7 +790,7 @@ function App() {
                 narrowingHint ? h("div", { className: "askHint" }, narrowingHint) : null,
                 h(
                     "div",
-                    { className: "askMessages" },
+                    { id: "guidedDemoMessages", className: "askMessages" },
                     messages.length === 0
                         ? h("div", { className: "askEmpty" }, "No messages yet.")
                         : messages.map((message, index) =>
@@ -609,7 +827,10 @@ function App() {
                                     && message.suggestedTerms.length > 0
                                     ? h(
                                         "div",
-                                        { className: "askSuggestions" },
+                                        {
+                                            className: "askSuggestions",
+                                            "data-demo-role": "suggestions",
+                                        },
                                         h("div", { className: "askSuggestionsLabel" }, "Try:"),
                                         h(
                                             "div",
