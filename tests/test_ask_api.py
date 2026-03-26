@@ -1,4 +1,5 @@
 from collections.abc import Iterator
+import json
 
 import pytest
 from fastapi import HTTPException
@@ -189,6 +190,68 @@ def test_ask_api_term_flow_success_with_llm(
         {"id": "spring::ch1", "book_id": "spring", "title": "Actuator"}
     ]
     assert body["graph_fragment"]["edges"] == []
+
+
+def test_ask_api_emits_structured_audit_log(
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: list[tuple[str, tuple[object, ...]]] = []
+
+    class StubLogger:
+        def info(self, message: str, *args: object) -> None:
+            captured.append((message, args))
+
+    def fake_run_runtime(*args: object, **kwargs: object) -> RuntimeResult:
+        _ = (args, kwargs)
+        return _runtime_result(
+            cluster_payload={
+                "schema_version": "cluster.v1",
+                "query": "Explain the term \"Actuator\" using the retrieved cluster.",
+                "query_type": "term",
+                "run_id": 7,
+                "enrichment_version": "v2_indexed_sections_bullets",
+                "seed": {
+                    "seed_chapter_ids": ["spring::ch1"],
+                    "seed_reason": "term_ilike",
+                },
+                "chapters": [],
+                "edges": [],
+                "constraints": {},
+            },
+            evidence={"sections": [], "bullets": []},
+            answer_markdown="answer ok",
+        )
+
+    monkeypatch.setattr(ask_router, "run_runtime", fake_run_runtime)
+    monkeypatch.setattr(ask_router, "AUDIT_LOGGER", StubLogger())
+
+    response = client.post(
+        "/ask",
+        json=_payload(user_query="Tell me about actuator", llm_enabled=True),
+        headers={
+            "X-Forwarded-For": "203.0.113.10, 10.0.0.2",
+            "User-Agent": "pytest-agent",
+        },
+    )
+
+    assert response.status_code == 200
+    assert len(captured) == 1
+    message, args = captured[0]
+    assert message == "ask_audit %s"
+    payload = json.loads(args[0])
+    assert payload["ip"] == "203.0.113.10"
+    assert payload["user_agent"] == "pytest-agent"
+    assert payload["query_type"] == "term"
+    assert payload["term"] == "Actuator"
+    assert payload["query"] == "Tell me about actuator"
+    assert payload["run_id"] == 7
+    assert payload["llm_enabled"] is True
+    assert payload["llm_timeout_ms"] == 60000
+    assert payload["outcome"] == "ok"
+    assert payload["http_status"] == 200
+    assert isinstance(payload["duration_ms"], int)
+    assert payload["duration_ms"] >= 0
 
 
 def test_ask_api_chapter_flow_success(
