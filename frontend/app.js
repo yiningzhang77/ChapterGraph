@@ -58,6 +58,19 @@ function renderMarkdownToHtml(markdownText) {
     return DOMPurify.sanitize(marked.parse(markdownText));
 }
 
+function getViewportDimensions(isDemoLayoutActive) {
+    if (isDemoLayoutActive) {
+        return {
+            width: Math.max(360, Math.floor(window.innerWidth * 0.5) - 20),
+            height: Math.max(420, window.innerHeight - 20),
+        };
+    }
+    return {
+        width: window.innerWidth,
+        height: window.innerHeight,
+    };
+}
+
 function createInitialState() {
     return {
         graph: null,
@@ -93,6 +106,7 @@ function App() {
     const [guidedDemoPhase, setGuidedDemoPhase] = useState("idle");
     const [guidedDemoStepIndex, setGuidedDemoStepIndex] = useState(0);
     const [guidedDemoError, setGuidedDemoError] = useState("");
+    const [onboardingVisible, setOnboardingVisible] = useState(false);
     const [state, dispatch] = useReducer(
         (currentState, action) => {
             const partial = coreReducer(currentState, action);
@@ -161,16 +175,17 @@ function App() {
 
     useEffect(() => {
         const handleResize = () => {
+            const nextDimensions = getViewportDimensions(guidedDemoLayoutActive);
             dispatch({
                 type: "RESIZE",
-                width: window.innerWidth,
-                height: window.innerHeight,
+                width: nextDimensions.width,
+                height: nextDimensions.height,
             });
         };
         handleResize();
         window.addEventListener("resize", handleResize);
         return () => window.removeEventListener("resize", handleResize);
-    }, []);
+    }, [guidedDemoLayoutActive]);
 
     useEffect(() => {
         fetch(`${API}/runs`)
@@ -203,6 +218,23 @@ function App() {
             })
             .catch(console.error);
     }, [selectedRun]);
+
+    useEffect(() => {
+        if (guidedDemoActive) {
+            setOnboardingVisible(false);
+            return;
+        }
+        if (!state.graph || !selectedRun) {
+            return;
+        }
+        if (window.sessionStorage.getItem("chaptergraph_onboarding_dismissed") === "1") {
+            return;
+        }
+        const timer = window.setTimeout(() => {
+            setOnboardingVisible(true);
+        }, 900);
+        return () => window.clearTimeout(timer);
+    }, [state.graph, selectedRun, guidedDemoActive]);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -628,6 +660,16 @@ function App() {
         await guidedDemoControllerRef.current?.next();
     };
 
+    const dismissOnboarding = () => {
+        window.sessionStorage.setItem("chaptergraph_onboarding_dismissed", "1");
+        setOnboardingVisible(false);
+    };
+
+    const startGuidedDemoFromOnboarding = async () => {
+        dismissOnboarding();
+        await startGuidedDemo();
+    };
+
     const askHeaderText = askMode === "chapter"
         ? "章节问答"
         : "术语问答";
@@ -650,6 +692,45 @@ function App() {
                 onStop: stopGuidedDemo,
                 onRestart: restartGuidedDemo,
             }),
+            onboardingVisible
+                ? h(
+                    "div",
+                    { className: "onboardingPrompt" },
+                    h("div", { className: "onboardingPromptTitle" }, "建议先看回放演示"),
+                    h(
+                        "div",
+                        { className: "onboardingPromptText" },
+                        "右上角的“回放演示（逐步）”会自动带你体验核心功能。你只需要点击“下一步”，完整流程约 2-3 分钟。",
+                    ),
+                    h(
+                        "div",
+                        { className: "onboardingPromptText subtle" },
+                        "左侧图支持双击展开书节点、滚轮缩放、拖动画布。",
+                    ),
+                    h(
+                        "div",
+                        { className: "onboardingPromptActions" },
+                        h(
+                            "button",
+                            {
+                                type: "button",
+                                className: "onboardingPromptBtn secondary",
+                                onClick: dismissOnboarding,
+                            },
+                            "稍后再看",
+                        ),
+                        h(
+                            "button",
+                            {
+                                type: "button",
+                                className: "onboardingPromptBtn primary",
+                                onClick: startGuidedDemoFromOnboarding,
+                            },
+                            "开始演示",
+                        ),
+                    ),
+                )
+                : null,
             h("div", { id: "topbar" },
                 h(
                     "select",
@@ -673,7 +754,11 @@ function App() {
                     state.theme === "dark" ? "Theme: Dark" : "Theme: Light",
                 ),
             ),
-            h("canvas", { id: "graph", ref: canvasRef }),
+            h("canvas", {
+                id: "graph",
+                ref: canvasRef,
+                className: guidedDemoLayoutActive ? "demoLayout" : "",
+            }),
             h("div", { id: "tooltip", ref: tooltipRef }),
             h("aside", {
                 id: "askPanel",
